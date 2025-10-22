@@ -12,6 +12,8 @@ type Dependencies struct {
 	AssignmentHandler       *handler.AssignmentHandler
 	SubmissionHandler       *handler.SubmissionHandler
 	StudentDashboardHandler *handler.StudentDashboardHandler
+	CodingTaskHandler       *handler.CodingTaskHandler
+	CodingSubmissionHandler *handler.CodingSubmissionHandler
 	JWTMiddleware           fiber.Handler
 }
 
@@ -37,6 +39,17 @@ func Register(app *fiber.App, cfg config.Config, deps Dependencies) {
 		if deps.SubmissionHandler != nil {
 			submissionGroup := tutorial.Group("/submissions")
 			deps.SubmissionHandler.Register(submissionGroup)
+		}
+	}
+
+	if deps.CodingTaskHandler != nil {
+		codingLab := app.Group("/api/v2/coding-lab", jwtMiddleware)
+		taskGroup := codingLab.Group("/tasks")
+		deps.CodingTaskHandler.Register(taskGroup)
+
+		if deps.CodingSubmissionHandler != nil {
+			submissionGroup := codingLab.Group("/submissions")
+			deps.CodingSubmissionHandler.Register(submissionGroup)
 		}
 	}
 
