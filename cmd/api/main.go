@@ -3,15 +3,24 @@ package main
 import (
 	"context"
 	"log"
+	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
+	"github.com/rs/zerolog"
 
 	"github.com/noah-isme/gema-go-api/internal/config"
+	"github.com/noah-isme/gema-go-api/internal/database"
+	"github.com/noah-isme/gema-go-api/internal/handler"
 	"github.com/noah-isme/gema-go-api/internal/middleware"
+	"github.com/noah-isme/gema-go-api/internal/models"
+	"github.com/noah-isme/gema-go-api/internal/repository"
 	"github.com/noah-isme/gema-go-api/internal/router"
+	"github.com/noah-isme/gema-go-api/internal/service"
+	cloud "github.com/noah-isme/gema-go-api/pkg/cloudinary"
 )
 
 func main() {
@@ -20,13 +29,58 @@ func main() {
 		log.Fatalf("failed to load configuration: %v", err)
 	}
 
+	logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
+
+	db, err := database.ConnectPostgres(cfg.DatabaseURL)
+	if err != nil {
+		log.Fatalf("failed to connect to database: %v", err)
+	}
+
+	if err := db.AutoMigrate(&models.Student{}, &models.Assignment{}, &models.Submission{}); err != nil {
+		log.Fatalf("failed to migrate database: %v", err)
+	}
+
+	redisClient, err := database.ConnectRedis(cfg.RedisURL)
+	if err != nil {
+		log.Fatalf("failed to connect to redis: %v", err)
+	}
+	defer redisClient.Close()
+
+	uploader, err := cloud.New(cloud.Config{
+		CloudName: cfg.CloudinaryCloudName,
+		APIKey:    cfg.CloudinaryAPIKey,
+		APISecret: cfg.CloudinaryAPISecret,
+		Folder:    cfg.CloudinaryUploadFolder,
+	}, logger)
+	if err != nil {
+		log.Fatalf("failed to create cloudinary client: %v", err)
+	}
+
+	validate := validator.New(validator.WithRequiredStructEnabled())
+
+	assignmentRepo := repository.NewAssignmentRepository(db)
+	submissionRepo := repository.NewSubmissionRepository(db)
+
+	assignmentService := service.NewAssignmentService(assignmentRepo, validate, uploader, logger)
+	submissionService := service.NewSubmissionService(submissionRepo, assignmentRepo, validate, uploader, logger)
+	dashboardService := service.NewStudentDashboardService(assignmentRepo, submissionRepo, redisClient, cfg.DashboardCacheTTL, logger)
+
+	assignmentHandler := handler.NewAssignmentHandler(assignmentService, validate, logger)
+	submissionHandler := handler.NewSubmissionHandler(submissionService, validate, logger)
+	studentDashboardHandler := handler.NewStudentDashboardHandler(dashboardService, logger)
+
 	app := fiber.New(fiber.Config{
 		AppName:      cfg.AppName,
 		ServerHeader: cfg.AppName,
 	})
 
 	middleware.Register(app)
-	router.Register(app, cfg)
+	router.Register(app, cfg, router.Dependencies{
+		AssignmentHandler:       assignmentHandler,
+		SubmissionHandler:       submissionHandler,
+		StudentDashboardHandler: studentDashboardHandler,
+		JWTMiddleware:           middleware.JWTProtected(cfg.JWTSecret),
+	})
 
 	go func() {
 		if err := app.Listen(cfg.HTTPAddress()); err != nil {

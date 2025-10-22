@@ -27,6 +27,6 @@ func HealthCheck(cfg config.Config) fiber.Handler {
 			Environment: cfg.AppEnv,
 		}
 
-		return utils.SendSuccess(c, payload)
+		return utils.SendSuccess(c, "service healthy", payload)
 	}
 }
