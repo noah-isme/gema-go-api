@@ -1,0 +1,17 @@
+# Binaries
+/bin/
+/tmp/
+*.log
+
+# Build artifacts
+/dist/
+/build/
+
+# Environment
+.env
+.env.local
+
+# IDEs
+.vscode/
+.idea/
+*.swp
