@@ -12,6 +12,7 @@ type Dependencies struct {
 	AssignmentHandler       *handler.AssignmentHandler
 	SubmissionHandler       *handler.SubmissionHandler
 	StudentDashboardHandler *handler.StudentDashboardHandler
+	WebLabHandler           *handler.WebLabHandler
 	JWTMiddleware           fiber.Handler
 }
 
@@ -38,6 +39,11 @@ func Register(app *fiber.App, cfg config.Config, deps Dependencies) {
 			submissionGroup := tutorial.Group("/submissions")
 			deps.SubmissionHandler.Register(submissionGroup)
 		}
+	}
+
+	if deps.WebLabHandler != nil {
+		webLab := app.Group("/api/v2/web-lab", jwtMiddleware)
+		deps.WebLabHandler.Register(webLab)
 	}
 
 	if deps.StudentDashboardHandler != nil {

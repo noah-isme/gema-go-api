@@ -36,7 +36,7 @@ func main() {
 		log.Fatalf("failed to connect to database: %v", err)
 	}
 
-	if err := db.AutoMigrate(&models.Student{}, &models.Assignment{}, &models.Submission{}); err != nil {
+	if err := db.AutoMigrate(&models.Student{}, &models.Assignment{}, &models.Submission{}, &models.WebAssignment{}, &models.WebSubmission{}); err != nil {
 		log.Fatalf("failed to migrate database: %v", err)
 	}
 
@@ -60,14 +60,19 @@ func main() {
 
 	assignmentRepo := repository.NewAssignmentRepository(db)
 	submissionRepo := repository.NewSubmissionRepository(db)
+	studentRepo := repository.NewStudentRepository(db)
+	webAssignmentRepo := repository.NewWebAssignmentRepository(db)
+	webSubmissionRepo := repository.NewWebSubmissionRepository(db)
 
 	assignmentService := service.NewAssignmentService(assignmentRepo, validate, uploader, logger)
 	submissionService := service.NewSubmissionService(submissionRepo, assignmentRepo, validate, uploader, logger)
 	dashboardService := service.NewStudentDashboardService(assignmentRepo, submissionRepo, redisClient, cfg.DashboardCacheTTL, logger)
+	webLabService := service.NewWebLabService(webAssignmentRepo, webSubmissionRepo, studentRepo, validate, uploader, logger)
 
 	assignmentHandler := handler.NewAssignmentHandler(assignmentService, validate, logger)
 	submissionHandler := handler.NewSubmissionHandler(submissionService, validate, logger)
 	studentDashboardHandler := handler.NewStudentDashboardHandler(dashboardService, logger)
+	webLabHandler := handler.NewWebLabHandler(webLabService, validate, logger)
 
 	app := fiber.New(fiber.Config{
 		AppName:      cfg.AppName,
@@ -79,6 +84,7 @@ func main() {
 		AssignmentHandler:       assignmentHandler,
 		SubmissionHandler:       submissionHandler,
 		StudentDashboardHandler: studentDashboardHandler,
+		WebLabHandler:           webLabHandler,
 		JWTMiddleware:           middleware.JWTProtected(cfg.JWTSecret),
 	})
 
