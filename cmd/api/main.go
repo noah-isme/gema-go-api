@@ -20,7 +20,9 @@ import (
 	"github.com/noah-isme/gema-go-api/internal/repository"
 	"github.com/noah-isme/gema-go-api/internal/router"
 	"github.com/noah-isme/gema-go-api/internal/service"
+	"github.com/noah-isme/gema-go-api/pkg/ai"
 	cloud "github.com/noah-isme/gema-go-api/pkg/cloudinary"
+	dockerexec "github.com/noah-isme/gema-go-api/pkg/docker"
 )
 
 func main() {
@@ -36,7 +38,7 @@ func main() {
 		log.Fatalf("failed to connect to database: %v", err)
 	}
 
-	if err := db.AutoMigrate(&models.Student{}, &models.Assignment{}, &models.Submission{}); err != nil {
+	if err := db.AutoMigrate(&models.Student{}, &models.Assignment{}, &models.Submission{}, &models.CodingTask{}, &models.CodingSubmission{}, &models.CodingEvaluation{}); err != nil {
 		log.Fatalf("failed to migrate database: %v", err)
 	}
 
@@ -60,14 +62,66 @@ func main() {
 
 	assignmentRepo := repository.NewAssignmentRepository(db)
 	submissionRepo := repository.NewSubmissionRepository(db)
+	codingTaskRepo := repository.NewCodingTaskRepository(db)
+	codingSubmissionRepo := repository.NewCodingSubmissionRepository(db)
 
 	assignmentService := service.NewAssignmentService(assignmentRepo, validate, uploader, logger)
 	submissionService := service.NewSubmissionService(submissionRepo, assignmentRepo, validate, uploader, logger)
 	dashboardService := service.NewStudentDashboardService(assignmentRepo, submissionRepo, redisClient, cfg.DashboardCacheTTL, logger)
 
+	executor, err := dockerexec.NewDockerExecutor(dockerexec.Config{
+		Host:          cfg.DockerHost,
+		Timeout:       cfg.ExecutionTimeout,
+		MemoryLimitMB: int64(cfg.CodeRunMemoryMB),
+		CPUShares:     int64(cfg.CodeRunCPUShares),
+		WorkingDir:    "/workspace",
+		Logger:        logger,
+	})
+	if err != nil {
+		log.Fatalf("failed to create docker executor: %v", err)
+	}
+	defer executor.Close()
+
+	var evaluator ai.Evaluator
+	switch cfg.AIProvider {
+	case "openai":
+		if cfg.OpenAIAPIKey != "" {
+			eval, evalErr := ai.NewOpenAIEvaluator(ai.OpenAIConfig{APIKey: cfg.OpenAIAPIKey, Logger: logger})
+			if evalErr != nil {
+				log.Fatalf("failed to create openai evaluator: %v", evalErr)
+			}
+			evaluator = eval
+		} else {
+			logger.Warn().Msg("openai provider selected but API key missing; AI evaluation disabled")
+		}
+	case "anthropic":
+		if cfg.AnthropicAPIKey != "" {
+			eval, evalErr := ai.NewAnthropicEvaluator(ai.AnthropicConfig{APIKey: cfg.AnthropicAPIKey})
+			if evalErr != nil {
+				log.Fatalf("failed to create anthropic evaluator: %v", evalErr)
+			}
+			evaluator = eval
+		} else {
+			logger.Warn().Msg("anthropic provider selected but API key missing; AI evaluation disabled")
+		}
+	default:
+		if cfg.AIProvider != "" {
+			logger.Warn().Str("provider", cfg.AIProvider).Msg("unknown AI provider, AI evaluation disabled")
+		}
+	}
+
+	codingTaskService := service.NewCodingTaskService(codingTaskRepo, logger)
+	codingSubmissionService := service.NewCodingSubmissionService(codingSubmissionRepo, codingTaskRepo, executor, evaluator, validate, logger, service.CodingSubmissionConfig{
+		ExecutionTimeout: cfg.ExecutionTimeout,
+		MemoryLimitMB:    cfg.CodeRunMemoryMB,
+		CPUShares:        cfg.CodeRunCPUShares,
+	})
+
 	assignmentHandler := handler.NewAssignmentHandler(assignmentService, validate, logger)
 	submissionHandler := handler.NewSubmissionHandler(submissionService, validate, logger)
 	studentDashboardHandler := handler.NewStudentDashboardHandler(dashboardService, logger)
+	codingTaskHandler := handler.NewCodingTaskHandler(codingTaskService, logger)
+	codingSubmissionHandler := handler.NewCodingSubmissionHandler(codingSubmissionService, validate, logger)
 
 	app := fiber.New(fiber.Config{
 		AppName:      cfg.AppName,
@@ -79,6 +133,8 @@ func main() {
 		AssignmentHandler:       assignmentHandler,
 		SubmissionHandler:       submissionHandler,
 		StudentDashboardHandler: studentDashboardHandler,
+		CodingTaskHandler:       codingTaskHandler,
+		CodingSubmissionHandler: codingSubmissionHandler,
 		JWTMiddleware:           middleware.JWTProtected(cfg.JWTSecret),
 	})
 

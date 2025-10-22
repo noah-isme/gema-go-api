@@ -47,6 +47,9 @@ func JWTProtected(secret string) fiber.Handler {
 		if userID := extractUserIDFromClaims(claims); userID != nil {
 			c.Locals("user_id", *userID)
 		}
+		if role := extractUserRoleFromClaims(claims); role != "" {
+			c.Locals("user_role", role)
+		}
 
 		return c.Next()
 	}
@@ -86,4 +89,35 @@ func normalizeUserID(value interface{}) (uint, error) {
 	default:
 		return 0, fmt.Errorf("unsupported subject type")
 	}
+}
+
+func extractUserRoleFromClaims(claims jwt.MapClaims) string {
+	candidates := []string{"role", "roles"}
+	for _, key := range candidates {
+		if value, ok := claims[key]; ok {
+			if role := normalizeRole(value); role != "" {
+				return role
+			}
+		}
+	}
+	return ""
+}
+
+func normalizeRole(value interface{}) string {
+	switch v := value.(type) {
+	case string:
+		return strings.ToLower(strings.TrimSpace(v))
+	case []interface{}:
+		for _, item := range v {
+			if str, ok := item.(string); ok {
+				role := strings.ToLower(strings.TrimSpace(str))
+				if role != "" {
+					return role
+				}
+			}
+		}
+	default:
+		return ""
+	}
+	return ""
 }
