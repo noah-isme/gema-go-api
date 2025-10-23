@@ -48,7 +48,7 @@ func (h *AdminAssignmentHandler) create(c *fiber.Ctx) error {
 		case isValidationError(err):
 			return utils.SendError(c, fiber.StatusBadRequest, err.Error())
 		default:
-			h.logger.Error().Err(err).Msg("failed to create assignment")
+			requestLogger(h.logger, c).Error().Err(err).Msg("failed to create assignment")
 			return utils.SendError(c, fiber.StatusInternalServerError, "failed to create assignment")
 		}
 	}
@@ -78,7 +78,7 @@ func (h *AdminAssignmentHandler) update(c *fiber.Ctx) error {
 		case isValidationError(err):
 			return utils.SendError(c, fiber.StatusBadRequest, err.Error())
 		default:
-			h.logger.Error().Err(err).Msg("failed to update assignment")
+			requestLogger(h.logger, c).Error().Err(err).Msg("failed to update assignment")
 			return utils.SendError(c, fiber.StatusInternalServerError, "failed to update assignment")
 		}
 	}
@@ -97,7 +97,7 @@ func (h *AdminAssignmentHandler) delete(c *fiber.Ctx) error {
 		if errors.Is(err, service.ErrAdminAssignmentNotFound) {
 			return utils.SendError(c, fiber.StatusNotFound, "assignment not found")
 		}
-		h.logger.Error().Err(err).Msg("failed to delete assignment")
+		requestLogger(h.logger, c).Error().Err(err).Msg("failed to delete assignment")
 		return utils.SendError(c, fiber.StatusInternalServerError, "failed to delete assignment")
 	}
 
@@ -115,7 +115,7 @@ func (h *AdminAssignmentHandler) get(c *fiber.Ctx) error {
 		if errors.Is(err, service.ErrAdminAssignmentNotFound) {
 			return utils.SendError(c, fiber.StatusNotFound, "assignment not found")
 		}
-		h.logger.Error().Err(err).Msg("failed to fetch assignment")
+		requestLogger(h.logger, c).Error().Err(err).Msg("failed to fetch assignment")
 		return utils.SendError(c, fiber.StatusInternalServerError, "failed to fetch assignment")
 	}
 

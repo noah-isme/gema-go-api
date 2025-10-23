@@ -65,7 +65,7 @@ func (h *AdminActivityHandler) list(c *fiber.Ctx) error {
 
 	response, err := h.service.List(c.Context(), req)
 	if err != nil {
-		h.logger.Error().Err(err).Msg("failed to list activity logs")
+		requestLogger(h.logger, c).Error().Err(err).Msg("failed to list activity logs")
 		return utils.SendError(c, fiber.StatusInternalServerError, "failed to list activity logs")
 	}
 
@@ -84,7 +84,7 @@ func (h *AdminActivityHandler) create(c *fiber.Ctx) error {
 		if isValidationError(err) {
 			return utils.SendError(c, fiber.StatusBadRequest, err.Error())
 		}
-		h.logger.Error().Err(err).Msg("failed to create activity log")
+		requestLogger(h.logger, c).Error().Err(err).Msg("failed to create activity log")
 		return utils.SendError(c, fiber.StatusInternalServerError, "failed to create activity log")
 	}
 

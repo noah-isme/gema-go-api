@@ -30,7 +30,7 @@ func (h *AdminAnalyticsHandler) Register(router fiber.Router) {
 func (h *AdminAnalyticsHandler) get(c *fiber.Ctx) error {
 	summary, err := h.service.GetSummary(c.Context())
 	if err != nil {
-		h.logger.Error().Err(err).Msg("failed to fetch analytics summary")
+		requestLogger(h.logger, c).Error().Err(err).Msg("failed to fetch analytics summary")
 		return utils.SendError(c, fiber.StatusInternalServerError, "failed to load analytics")
 	}
 

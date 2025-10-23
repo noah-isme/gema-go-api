@@ -1,0 +1,45 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AdminAnalyticsEnvelope",
+  "type": "object",
+  "required": ["success", "message", "data"],
+  "properties": {
+    "success": {"type": "boolean"},
+    "message": {"type": "string"},
+    "data": {
+      "type": "object",
+      "required": [
+        "active_students",
+        "on_time_submissions",
+        "late_submissions",
+        "grade_distribution",
+        "weekly_engagement",
+        "generated_at",
+        "cache_hit"
+      ],
+      "properties": {
+        "active_students": {"type": "integer", "minimum": 0},
+        "on_time_submissions": {"type": "integer", "minimum": 0},
+        "late_submissions": {"type": "integer", "minimum": 0},
+        "grade_distribution": {
+          "type": "object",
+          "additionalProperties": {"type": "integer", "minimum": 0}
+        },
+        "weekly_engagement": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["week_start", "submissions"],
+            "properties": {
+              "week_start": {"type": "string", "format": "date-time"},
+              "submissions": {"type": "integer", "minimum": 0}
+            }
+          }
+        },
+        "generated_at": {"type": "string", "format": "date-time"},
+        "cache_hit": {"type": "boolean"}
+      }
+    }
+  },
+  "additionalProperties": false
+}
