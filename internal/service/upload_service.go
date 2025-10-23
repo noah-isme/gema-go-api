@@ -16,6 +16,10 @@ import (
 
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/rs/zerolog"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/noah-isme/gema-go-api/internal/dto"
 	"github.com/noah-isme/gema-go-api/internal/models"
@@ -47,6 +51,7 @@ type uploadService struct {
 	repo    repository.UploadRepository
 	logger  zerolog.Logger
 	maxSize int64
+	tracer  trace.Tracer
 }
 
 // NewUploadService constructs an upload service.
@@ -59,57 +64,93 @@ func NewUploadService(storage FileStorage, repo repository.UploadRepository, max
 		repo:    repo,
 		logger:  logger.With().Str("component", "upload_service").Logger(),
 		maxSize: int64(maxSizeMB) * 1024 * 1024,
+		tracer:  otel.Tracer("github.com/noah-isme/gema-go-api/internal/service/upload"),
 	}
 }
 
 func (s *uploadService) Upload(ctx context.Context, file *multipart.FileHeader, userID *uint) (dto.UploadResponse, error) {
+	ctx, span := s.tracer.Start(ctx, "upload.store")
+	defer span.End()
+
+	span.SetAttributes(attribute.Int64("upload.max_bytes", s.maxSize))
+	if file != nil {
+		span.SetAttributes(
+			attribute.String("upload.original_name", strings.TrimSpace(file.Filename)),
+			attribute.Int64("upload.request_size", file.Size),
+		)
+	} else {
+		span.SetAttributes(attribute.Bool("upload.file_present", false))
+	}
+
 	start := time.Now()
 	defer func() {
 		observability.UploadLatency().Observe(time.Since(start).Seconds())
 	}()
 
 	if file == nil {
-		return dto.UploadResponse{}, errors.New("file is required")
+		err := errors.New("file is required")
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "validation failed")
+		return dto.UploadResponse{}, err
 	}
 
 	if file.Size > s.maxSize {
 		observability.UploadRejected().WithLabelValues("size").Inc()
+		span.RecordError(ErrUploadTooLarge)
+		span.SetStatus(codes.Error, "payload too large")
 		return dto.UploadResponse{}, ErrUploadTooLarge
 	}
 
 	handle, err := file.Open()
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "open failed")
 		return dto.UploadResponse{}, err
 	}
 	defer handle.Close()
 
 	buf := bytes.NewBuffer(nil)
 	if _, err := io.Copy(buf, io.LimitReader(handle, s.maxSize+1)); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "read failed")
 		return dto.UploadResponse{}, err
 	}
 	if int64(buf.Len()) > s.maxSize {
 		observability.UploadRejected().WithLabelValues("size").Inc()
+		span.RecordError(ErrUploadTooLarge)
+		span.SetStatus(codes.Error, "payload too large")
 		return dto.UploadResponse{}, ErrUploadTooLarge
 	}
 
 	mime := mimetype.Detect(buf.Bytes())
 	fileType := normalizeMime(mime.String())
+	span.SetAttributes(attribute.String("upload.detected_mime", fileType))
 	if !isAllowedType(fileType) {
 		observability.UploadRejected().WithLabelValues("type").Inc()
+		span.RecordError(ErrUploadTypeNotAllowed)
+		span.SetStatus(codes.Error, "type not allowed")
 		return dto.UploadResponse{}, ErrUploadTypeNotAllowed
 	}
 
 	if err := s.scan(buf.Bytes(), fileType); err != nil {
 		observability.UploadRejected().WithLabelValues("scan").Inc()
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "scan failed")
 		return dto.UploadResponse{}, err
 	}
 
 	checksum := sha256.Sum256(buf.Bytes())
 	sanitizedName := sanitizeFileName(file.Filename)
+	span.SetAttributes(
+		attribute.String("upload.sanitized_name", sanitizedName),
+		attribute.Int64("upload.size_bytes", int64(buf.Len())),
+	)
 
 	url, err := s.storage.Upload(ctx, sanitizedName, bytes.NewReader(buf.Bytes()))
 	if err != nil {
 		observability.UploadRejected().WithLabelValues("storage").Inc()
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "storage failed")
 		return dto.UploadResponse{}, err
 	}
 
@@ -122,13 +163,17 @@ func (s *uploadService) Upload(ctx context.Context, file *multipart.FileHeader, 
 	}
 	if userID != nil {
 		record.UserID = userID
+		span.SetAttributes(attribute.Int("upload.user_id", int(*userID)))
 	}
 
 	if err := s.repo.Create(ctx, &record); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "persistence failed")
 		return dto.UploadResponse{}, err
 	}
 
 	observability.UploadRequests().WithLabelValues(fileType).Inc()
+	span.SetStatus(codes.Ok, "stored")
 
 	return dto.UploadResponse{
 		URL:       url,

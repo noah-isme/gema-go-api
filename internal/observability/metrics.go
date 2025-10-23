@@ -12,9 +12,11 @@ var (
 	adminLatencySeconds         *prometheus.HistogramVec
 	adminErrorsTotal            *prometheus.CounterVec
 	chatConnectionsTotal        prometheus.Counter
+	chatDisconnectsTotal        prometheus.Counter
 	chatMessagesSent            *prometheus.CounterVec
 	sseClientsActive            prometheus.Gauge
 	notificationsPublishedTotal *prometheus.CounterVec
+	realtimeErrorsTotal         *prometheus.CounterVec
 	activeActivitiesRequests    *prometheus.CounterVec
 	activeActivitiesLatency     prometheus.Histogram
 	announcementsRequests       *prometheus.CounterVec
@@ -51,6 +53,11 @@ func RegisterMetrics() {
 			Help: "Total number of websocket chat connections established.",
 		})
 
+		chatDisconnectsTotal = prometheus.NewCounter(prometheus.CounterOpts{
+			Name: "chat_disconnects_total",
+			Help: "Total number of websocket chat disconnects observed.",
+		})
+
 		chatMessagesSent = prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name: "chat_messages_sent",
 			Help: "Total chat messages sent segmented by type.",
@@ -65,6 +72,11 @@ func RegisterMetrics() {
 			Name: "notifications_published_total",
 			Help: "Total number of notifications published segmented by type.",
 		}, []string{"type"})
+
+		realtimeErrorsTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "realtime_errors_total",
+			Help: "Total number of realtime streaming errors segmented by component and reason.",
+		}, []string{"component", "reason"})
 
 		activeActivitiesRequests = prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name: "active_activities_requests_total",
@@ -125,9 +137,11 @@ func RegisterMetrics() {
 			adminLatencySeconds,
 			adminErrorsTotal,
 			chatConnectionsTotal,
+			chatDisconnectsTotal,
 			chatMessagesSent,
 			sseClientsActive,
 			notificationsPublishedTotal,
+			realtimeErrorsTotal,
 			activeActivitiesRequests,
 			activeActivitiesLatency,
 			announcementsRequests,
@@ -166,6 +180,12 @@ func ChatConnectionsTotal() prometheus.Counter {
 	return chatConnectionsTotal
 }
 
+// ChatDisconnectsTotal exposes the chat disconnect counter.
+func ChatDisconnectsTotal() prometheus.Counter {
+	RegisterMetrics()
+	return chatDisconnectsTotal
+}
+
 // ChatMessagesSent exposes the chat messages counter vector.
 func ChatMessagesSent() *prometheus.CounterVec {
 	RegisterMetrics()
@@ -182,6 +202,12 @@ func SSEClientsActive() prometheus.Gauge {
 func NotificationsPublishedTotal() *prometheus.CounterVec {
 	RegisterMetrics()
 	return notificationsPublishedTotal
+}
+
+// RealtimeErrorsTotal exposes the realtime error counter vector.
+func RealtimeErrorsTotal() *prometheus.CounterVec {
+	RegisterMetrics()
+	return realtimeErrorsTotal
 }
 
 // ActiveActivitiesRequests exposes the active activities counter.

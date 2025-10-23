@@ -1,0 +1,944 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "GEMA Supporting Features API",
+    "version": "1.0.0",
+    "description": "Public content, uploads, contact form, and seeding endpoints for the GEMA LMS v2 deployment."
+  },
+  "servers": [
+    {
+      "url": "https://api.gema.dev",
+      "description": "Production"
+    },
+    {
+      "url": "https://staging.api.gema.dev",
+      "description": "Staging"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/api/activities/active": {
+      "get": {
+        "summary": "Fetch active activity feed",
+        "description": "Returns a paginated list of recent platform activity items. The endpoint is public and may be cached.",
+        "tags": [
+          "Activities"
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "description": "Page number (default 1)."
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "description": "Page size (default 20)."
+          },
+          {
+            "name": "userId",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "description": "Filter activities by actor ID."
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "action",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Activity feed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActivityFeedEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/api/announcements": {
+      "get": {
+        "summary": "List announcements",
+        "tags": [
+          "Announcements"
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Announcement list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnnouncementListEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/api/gallery": {
+      "get": {
+        "summary": "List gallery items",
+        "tags": [
+          "Gallery"
+        ],
+        "parameters": [
+          {
+            "name": "tags",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Comma-separated tags filter."
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 120
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Gallery list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GalleryListEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/api/contact": {
+      "post": {
+        "summary": "Submit contact form",
+        "description": "Accepts a contact message for the support team. Authenticated requests automatically bind the user ID.",
+        "tags": [
+          "Contact"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContactRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Submission accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContactEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "success": false,
+                  "message": "duplicate submission"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/upload": {
+      "post": {
+        "summary": "Upload a file",
+        "description": "Stores an authenticated upload after validating size, MIME type, and content. Accepts images, ZIP archives, and PDFs up to the configured quota.",
+        "tags": [
+          "Upload"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "File payload (.zip, .pdf, image)."
+                  }
+                },
+                "required": [
+                  "file"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Upload successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "413": {
+            "description": "Payload too large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "success": false,
+                  "message": "file exceeds maximum allowed size"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/seed/announcements": {
+      "post": {
+        "summary": "Seed announcements",
+        "tags": [
+          "Seed"
+        ],
+        "parameters": [
+          {
+            "name": "X-Seed-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 16
+            },
+            "description": "Seed token required when SEED_ENABLED is true."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SeedAnnouncementsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Seed applied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeedEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/seed/gallery": {
+      "post": {
+        "summary": "Seed gallery items",
+        "tags": [
+          "Seed"
+        ],
+        "parameters": [
+          {
+            "name": "X-Seed-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 16
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SeedGalleryRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Seed applied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeedEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Bad request",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "Unauthorized",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "Forbidden",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "SuccessEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "example": "success"
+          },
+          "data": {
+            "nullable": true
+          }
+        },
+        "required": [
+          "success",
+          "message"
+        ]
+      },
+      "ErrorEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": false
+          },
+          "message": {
+            "type": "string",
+            "example": "invalid payload"
+          }
+        },
+        "required": [
+          "success",
+          "message"
+        ]
+      },
+      "PaginationMeta": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer"
+          },
+          "page_size": {
+            "type": "integer"
+          },
+          "total_items": {
+            "type": "integer"
+          },
+          "total_pages": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "page",
+          "page_size",
+          "total_items",
+          "total_pages"
+        ]
+      },
+      "ActivityFeedItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "actor_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "actor_role": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string"
+          },
+          "entity_type": {
+            "type": "string"
+          },
+          "entity_id": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "actor_id",
+          "actor_role",
+          "action",
+          "entity_type",
+          "created_at"
+        ]
+      },
+      "ActivityFeedEnvelope": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SuccessEnvelope"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "object",
+                "properties": {
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/ActivityFeedItem"
+                    }
+                  },
+                  "pagination": {
+                    "$ref": "#/components/schemas/PaginationMeta"
+                  },
+                  "cache_hit": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "items",
+                  "pagination"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "Announcement": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "starts_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "ends_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "is_pinned": {
+            "type": "boolean"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "body",
+          "starts_at",
+          "is_pinned",
+          "created_at"
+        ]
+      },
+      "AnnouncementListEnvelope": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SuccessEnvelope"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "object",
+                "properties": {
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/Announcement"
+                    }
+                  },
+                  "pagination": {
+                    "$ref": "#/components/schemas/PaginationMeta"
+                  },
+                  "cache_hit": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "items",
+                  "pagination"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "GalleryItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "title": {
+            "type": "string"
+          },
+          "caption": {
+            "type": "string"
+          },
+          "image_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "image_url",
+          "created_at"
+        ]
+      },
+      "GalleryListEnvelope": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SuccessEnvelope"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "object",
+                "properties": {
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/GalleryItem"
+                    }
+                  },
+                  "pagination": {
+                    "$ref": "#/components/schemas/PaginationMeta"
+                  }
+                },
+                "required": [
+                  "items",
+                  "pagination"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "ContactRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 120
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "message": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 2000
+          },
+          "source": {
+            "type": "string",
+            "maxLength": 60
+          },
+          "_note": {
+            "type": "string",
+            "description": "Honeypot field; must be blank."
+          }
+        },
+        "required": [
+          "name",
+          "email",
+          "message"
+        ]
+      },
+      "ContactResponse": {
+        "type": "object",
+        "properties": {
+          "reference_id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "sent",
+              "queued"
+            ]
+          }
+        },
+        "required": [
+          "reference_id",
+          "status"
+        ]
+      },
+      "ContactEnvelope": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SuccessEnvelope"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "$ref": "#/components/schemas/ContactResponse"
+              },
+              "message": {
+                "type": "string",
+                "example": "contact submission accepted"
+              }
+            }
+          }
+        ]
+      },
+      "UploadResponse": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "mime_type": {
+            "type": "string"
+          },
+          "checksum": {
+            "type": "string"
+          },
+          "file_name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "size_bytes",
+          "mime_type",
+          "checksum",
+          "file_name"
+        ]
+      },
+      "UploadEnvelope": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SuccessEnvelope"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "$ref": "#/components/schemas/UploadResponse"
+              },
+              "message": {
+                "type": "string",
+                "example": "upload successful"
+              }
+            }
+          }
+        ]
+      },
+      "SeedAnnouncement": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "starts_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "ends_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "is_pinned": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "title",
+          "body",
+          "starts_at"
+        ]
+      },
+      "SeedAnnouncementsRequest": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SeedAnnouncement"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "SeedGalleryItem": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "caption": {
+            "type": "string"
+          },
+          "image_path": {
+            "type": "string"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "title",
+          "image_path"
+        ]
+      },
+      "SeedGalleryRequest": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SeedGalleryItem"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "SeedEnvelope": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SuccessEnvelope"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "object",
+                "properties": {
+                  "affected": {
+                    "type": "integer",
+                    "format": "int64"
+                  }
+                },
+                "required": [
+                  "affected"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

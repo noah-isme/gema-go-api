@@ -2,8 +2,8 @@
   "openapi": "3.0.3",
   "info": {
     "title": "GEMA Admin API",
-    "version": "0.4.0-alpha",
-    "description": "Administrative endpoints for managing students, assignments, grading, analytics, and activity logs in the GEMA LMS."
+    "version": "1.0.0",
+    "description": "Administrative endpoints for managing students, assignments, grading, analytics, and activity logs in the GEMA LMS. Version 1.0.0 captures the final Phase 6 surface area, including analytics caching and activity feeds."
   },
   "servers": [
     { "url": "https://api.gema.dev", "description": "Production" },

@@ -62,9 +62,11 @@ Automated checks run on every pull request and push to `main` via GitHub Actions
 3. **Contract Tests** – validates the admin analytics response envelope against the published JSON schema (`go test ./tests/contract`).
 4. **Build** – compiles the API binary (`go build ./cmd/api`).
 5. **Deploy Staging** – triggers the staging deployment script after all checks succeed.
-6. **Release Tagging** – automatically creates or updates the `v0.4.0-alpha` tag pointing at the passing commit on `main`.
+6. **Release Tagging** – automatically creates or updates the `v1.0.0` tag pointing at the passing commit on `main`.
 
 The workflow mirrors the local developer checklist: `go fmt ./... && go vet ./... && go test ./... && go build ./cmd/api`.
+
+Additional CI jobs publish the OpenAPI specifications (`docs/api/*.json`) as downloadable artifacts, execute realtime load tests, and tag releases for both `v0.6.0-alpha` (staging) and `v1.0.0` (production) on successful builds.
 
 ## Frontend Integration (Admin LMS UI)
 
@@ -75,6 +77,19 @@ Frontend clients consume the admin APIs via the OpenAPI contract located at [`do
 - **Error Handling** – responses follow the `{ success, message, data }` envelope; check `success` before accessing payload fields.
 - **Caching Hints** – analytics endpoints surface the `cache_hit` flag to determine whether to refresh dashboards aggressively.
 - **Telemetry** – Prometheus counters/histograms (`admin_requests_total`, `admin_latency_seconds`, `admin_errors_total`) expose request patterns and error rates for UI observability dashboards. Metrics are published via the shared `/metrics` endpoint.
+
+## Labs API Contracts
+
+Student clients integrate with the coding and web lab experiences using the OpenAPI specification at [`docs/api/labs.json`](docs/api/labs.json). The document captures request/response envelopes for coding tasks, code execution submissions, AI evaluations, and web lab uploads (including size limits and error envelopes).
+
+Realtime consumers (chat, notifications, discussion) rely on [`docs/api/realtime.json`](docs/api/realtime.json), while supporting content clients (activities, announcements, gallery, contact, upload, seed) follow [`docs/api/supporting.json`](docs/api/supporting.json). Both specifications include SSE/WebSocket payload examples and are published as build artifacts in CI for contract validation.
+
+## Operations Runbooks
+
+- [`docs/RUNBOOK-ADMIN-GRADING-ROLLBACK.md`](docs/RUNBOOK-ADMIN-GRADING-ROLLBACK.md) – targeted rollback process for admin grading incidents.
+- [`docs/RUNBOOK-OPS-GUIDE.md`](docs/RUNBOOK-OPS-GUIDE.md) – consolidated operational guide covering database rollback, seed recovery, Redis cache management, upload quota adjustments, SSE reconnect storms, NATS reconnect/drain workflows, and Redis pub/sub backpressure recovery.
+- [`docs/RUNBOOK-PHASE6.md`](docs/RUNBOOK-PHASE6.md) – scenario-specific playbooks introduced during Phase 6 (contact delivery/spam detection, upload quota, cache invalidation, and seed rollback).
+- [`docs/observability/realtime-alerts.yaml`](docs/observability/realtime-alerts.yaml) – PrometheusRule definitions for realtime streaming error rate and chat disconnect thresholds.
 
 ## Web Lab Workflow
 
