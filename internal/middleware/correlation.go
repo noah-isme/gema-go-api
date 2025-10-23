@@ -58,3 +58,14 @@ func GetCorrelationID(c *fiber.Ctx) string {
 	}
 	return CorrelationIDFromContext(c.Context())
 }
+
+// ContextWithCorrelation attaches the correlation identifier to the provided context.
+func ContextWithCorrelation(ctx context.Context, correlationID string) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if strings.TrimSpace(correlationID) == "" {
+		return ctx
+	}
+	return context.WithValue(ctx, correlationKey, strings.TrimSpace(correlationID))
+}

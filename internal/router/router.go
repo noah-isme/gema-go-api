@@ -1,6 +1,8 @@
 package router
 
 import (
+	"time"
+
 	"github.com/gofiber/fiber/v2"
 
 	"github.com/noah-isme/gema-go-api/internal/config"
@@ -21,6 +23,9 @@ type Dependencies struct {
 	AdminGradingHandler     *handler.AdminGradingHandler
 	AdminAnalyticsHandler   *handler.AdminAnalyticsHandler
 	AdminActivityHandler    *handler.AdminActivityHandler
+	ChatHandler             *handler.ChatHandler
+	NotificationHandler     *handler.NotificationHandler
+	DiscussionHandler       *handler.DiscussionHandler
 	JWTMiddleware           fiber.Handler
 }
 
@@ -74,6 +79,21 @@ func Register(app *fiber.App, cfg config.Config, deps Dependencies) {
 	if deps.StudentDashboardHandler != nil {
 		student := app.Group("/api/v2/student", jwtMiddleware)
 		deps.StudentDashboardHandler.Register(student)
+	}
+
+	if deps.ChatHandler != nil {
+		chat := app.Group("/api/v2/chat", jwtMiddleware, middleware.RequireRole("student", "teacher", "admin"), middleware.RateLimit("chat", 10, time.Second))
+		deps.ChatHandler.Register(chat)
+	}
+
+	if deps.NotificationHandler != nil {
+		notifications := app.Group("/api/v2/notifications", jwtMiddleware, middleware.RequireRole("student", "teacher", "admin"), middleware.RateLimit("notifications", 8, time.Second))
+		deps.NotificationHandler.Register(notifications)
+	}
+
+	if deps.DiscussionHandler != nil {
+		discussions := app.Group("/api/v2/discussion", jwtMiddleware, middleware.RequireRole("student", "teacher", "admin"), middleware.RateLimit("discussion", 20, time.Second))
+		deps.DiscussionHandler.Register(discussions)
 	}
 
 	if deps.AdminStudentHandler != nil || deps.AdminAssignmentHandler != nil || deps.AdminGradingHandler != nil || deps.AdminAnalyticsHandler != nil || deps.AdminActivityHandler != nil {

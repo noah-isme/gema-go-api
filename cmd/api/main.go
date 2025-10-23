@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
+	"github.com/nats-io/nats.go"
 	"github.com/rs/zerolog"
 
 	"github.com/noah-isme/gema-go-api/internal/config"
@@ -51,6 +52,10 @@ func main() {
 		&models.CodingSubmission{},
 		&models.CodingEvaluation{},
 		&models.ActivityLog{},
+		&models.ChatMessage{},
+		&models.Notification{},
+		&models.DiscussionThread{},
+		&models.DiscussionReply{},
 	); err != nil {
 		log.Fatalf("failed to migrate database: %v", err)
 	}
@@ -60,6 +65,15 @@ func main() {
 		log.Fatalf("failed to connect to redis: %v", err)
 	}
 	defer redisClient.Close()
+
+	var natsConn *nats.Conn
+	if cfg.NATSURL != "" {
+		natsConn, err = nats.Connect(cfg.NATSURL, nats.Name("GEMA API"))
+		if err != nil {
+			log.Fatalf("failed to connect to nats: %v", err)
+		}
+		defer natsConn.Drain()
+	}
 
 	uploader, err := cloud.New(cloud.Config{
 		CloudName: cfg.CloudinaryCloudName,
@@ -87,6 +101,9 @@ func main() {
 
 	codingTaskRepo := repository.NewCodingTaskRepository(db)
 	codingSubmissionRepo := repository.NewCodingSubmissionRepository(db)
+	chatRepo := repository.NewChatRepository(db)
+	notificationRepo := repository.NewNotificationRepository(db)
+	discussionRepo := repository.NewDiscussionRepository(db)
 
 	// Services
 	assignmentService := service.NewAssignmentService(assignmentRepo, validate, uploader, logger)
@@ -98,6 +115,13 @@ func main() {
 	adminAssignmentService := service.NewAdminAssignmentService(assignmentRepo, validate, activityService, logger)
 	adminGradingService := service.NewAdminGradingService(adminSubmissionRepo, validate, activityService, logger)
 	adminAnalyticsService := service.NewAdminAnalyticsService(analyticsRepo, redisClient, cfg.AnalyticsCacheTTL, logger)
+	notificationService := service.NewNotificationService(notificationRepo, redisClient, cfg.RedisPubSubChannel, natsConn, validate, logger)
+	chatService := service.NewChatService(chatRepo, redisClient, cfg.RedisPubSubChannel, natsConn, validate, logger)
+	discussionService := service.NewDiscussionService(discussionRepo, notificationService, validate, logger)
+
+	serviceCtx, serviceCancel := context.WithCancel(context.Background())
+	chatService.Start(serviceCtx)
+	notificationService.Start(serviceCtx)
 
 	executor, err := dockerexec.NewDockerExecutor(dockerexec.Config{
 		Host:          cfg.DockerHost,
@@ -167,6 +191,9 @@ func main() {
 	adminGradingHandler := handler.NewAdminGradingHandler(adminGradingService, logger)
 	adminAnalyticsHandler := handler.NewAdminAnalyticsHandler(adminAnalyticsService, logger)
 	adminActivityHandler := handler.NewAdminActivityHandler(activityService, logger)
+	chatHandler := handler.NewChatHandler(chatService, validate, logger)
+	notificationHandler := handler.NewNotificationHandler(notificationService, logger, cfg.SSEClientTimeout)
+	discussionHandler := handler.NewDiscussionHandler(discussionService, validate, logger)
 
 	// App & router
 	app := fiber.New(fiber.Config{
@@ -188,6 +215,9 @@ func main() {
 		AdminGradingHandler:     adminGradingHandler,
 		AdminAnalyticsHandler:   adminAnalyticsHandler,
 		AdminActivityHandler:    adminActivityHandler,
+		ChatHandler:             chatHandler,
+		NotificationHandler:     notificationHandler,
+		DiscussionHandler:       discussionHandler,
 		JWTMiddleware:           middleware.JWTProtected(cfg.JWTSecret),
 	})
 
@@ -197,17 +227,21 @@ func main() {
 		}
 	}()
 
-	waitForShutdown(app)
+	waitForShutdown(app, serviceCancel)
 }
 
-func waitForShutdown(app *fiber.App) {
+func waitForShutdown(app *fiber.App, stopBackground context.CancelFunc) {
 	shutdownCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
 	<-shutdownCtx.Done()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+	if stopBackground != nil {
+		stopBackground()
+	}
+
+	ctx, cancelCtx := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancelCtx()
 
 	if err := app.ShutdownWithContext(ctx); err != nil {
 		log.Printf("graceful shutdown failed: %v", err)

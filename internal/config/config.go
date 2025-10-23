@@ -14,8 +14,11 @@ type Config struct {
 	AppName                string
 	AppEnv                 string
 	AppPort                string
+	WSPort                 string
 	DatabaseURL            string
 	RedisURL               string
+	RedisPubSubChannel     string
+	NATSURL                string
 	JWTSecret              string
 	JWTRefreshSecret       string
 	CloudinaryCloudName    string
@@ -24,6 +27,7 @@ type Config struct {
 	CloudinaryUploadFolder string
 	DashboardCacheTTL      time.Duration
 	AnalyticsCacheTTL      time.Duration
+	SSEClientTimeout       time.Duration
 	DockerHost             string
 	ExecutionTimeout       time.Duration
 	CodeRunMemoryMB        int
@@ -42,6 +46,19 @@ func (c Config) HTTPAddress() string {
 	return fmt.Sprintf(":%s", c.AppPort)
 }
 
+// WSAddress returns the address the WebSocket server should listen on.
+func (c Config) WSAddress() string {
+	if c.WSPort == "" {
+		return c.HTTPAddress()
+	}
+
+	if strings.HasPrefix(c.WSPort, ":") {
+		return c.WSPort
+	}
+
+	return fmt.Sprintf(":%s", c.WSPort)
+}
+
 // Load reads configuration values from environment variables and optional .env file.
 func Load() (Config, error) {
 	_ = godotenv.Load()
@@ -55,12 +72,16 @@ func Load() (Config, error) {
 	v.SetDefault("app.env", "development")
 	v.SetDefault("app.port", "8080")
 	v.SetDefault("cloudinary.folder", "gema/tutorial")
+	v.SetDefault("ws.port", "")
 	v.SetDefault("dashboard.cache_ttl", "5m")
 	v.SetDefault("analytics.cache_ttl", "2m")
+	v.SetDefault("sse.client_timeout", "55s")
 	v.SetDefault("execution_timeout_ms", 5000)
 	v.SetDefault("code_run_memory_mb", 256)
 	v.SetDefault("code_run_cpu_shares", 512)
 	v.SetDefault("ai.provider", "openai")
+	v.SetDefault("redis.pubsub_channel", "gema:events")
+	v.SetDefault("nats.url", "")
 
 	ttlString := v.GetString("dashboard.cache_ttl")
 	if ttlString == "" {
@@ -82,6 +103,16 @@ func Load() (Config, error) {
 		return Config{}, fmt.Errorf("invalid analytics cache ttl: %w", err)
 	}
 
+	sseTimeoutString := v.GetString("sse.client_timeout")
+	if sseTimeoutString == "" {
+		sseTimeoutString = "55s"
+	}
+
+	sseTimeout, err := time.ParseDuration(sseTimeoutString)
+	if err != nil {
+		return Config{}, fmt.Errorf("invalid sse client timeout: %w", err)
+	}
+
 	timeoutMs := v.GetInt("execution_timeout_ms")
 	if timeoutMs <= 0 {
 		timeoutMs = 5000
@@ -91,8 +122,11 @@ func Load() (Config, error) {
 		AppName:                v.GetString("app.name"),
 		AppEnv:                 v.GetString("app.env"),
 		AppPort:                v.GetString("app.port"),
+		WSPort:                 v.GetString("ws.port"),
 		DatabaseURL:            v.GetString("database.url"),
 		RedisURL:               v.GetString("redis.url"),
+		RedisPubSubChannel:     v.GetString("redis.pubsub_channel"),
+		NATSURL:                v.GetString("nats.url"),
 		JWTSecret:              v.GetString("jwt.secret"),
 		JWTRefreshSecret:       v.GetString("jwt.refresh_secret"),
 		CloudinaryCloudName:    v.GetString("cloudinary.cloud_name"),
@@ -101,6 +135,7 @@ func Load() (Config, error) {
 		CloudinaryUploadFolder: v.GetString("cloudinary.folder"),
 		DashboardCacheTTL:      ttl,
 		AnalyticsCacheTTL:      analyticsTTL,
+		SSEClientTimeout:       sseTimeout,
 		DockerHost:             v.GetString("docker_host"),
 		ExecutionTimeout:       time.Duration(timeoutMs) * time.Millisecond,
 		CodeRunMemoryMB:        v.GetInt("code_run_memory_mb"),
