@@ -28,17 +28,20 @@ type SubmissionFilter struct {
 
 // SubmissionResponse is returned to API clients when viewing submissions.
 type SubmissionResponse struct {
-	ID           uint           `json:"id"`
-	AssignmentID uint           `json:"assignment_id"`
-	StudentID    uint           `json:"student_id"`
-	FileURL      string         `json:"file_url"`
-	Status       string         `json:"status"`
-	Grade        *float64       `json:"grade"`
-	Feedback     string         `json:"feedback"`
-	CreatedAt    time.Time      `json:"created_at"`
-	UpdatedAt    time.Time      `json:"updated_at"`
-	Assignment   AssignmentLite `json:"assignment"`
-	Student      StudentLite    `json:"student"`
+	ID           uint                             `json:"id"`
+	AssignmentID uint                             `json:"assignment_id"`
+	StudentID    uint                             `json:"student_id"`
+	FileURL      string                           `json:"file_url"`
+	Status       string                           `json:"status"`
+	Grade        *float64                         `json:"grade"`
+	Feedback     string                           `json:"feedback"`
+	GradedBy     *uint                            `json:"graded_by"`
+	GradedAt     *time.Time                       `json:"graded_at"`
+	History      []SubmissionGradeHistoryResponse `json:"history"`
+	CreatedAt    time.Time                        `json:"created_at"`
+	UpdatedAt    time.Time                        `json:"updated_at"`
+	Assignment   AssignmentLite                   `json:"assignment"`
+	Student      StudentLite                      `json:"student"`
 }
 
 // AssignmentLite summarizes an assignment in submission responses.
@@ -46,6 +49,14 @@ type AssignmentLite struct {
 	ID      uint      `json:"id"`
 	Title   string    `json:"title"`
 	DueDate time.Time `json:"due_date"`
+}
+
+// SubmissionGradeHistoryResponse serializes grading history entries.
+type SubmissionGradeHistoryResponse struct {
+	Score    float64   `json:"score"`
+	Feedback string    `json:"feedback"`
+	GradedBy uint      `json:"graded_by"`
+	GradedAt time.Time `json:"graded_at"`
 }
 
 // StudentLite summarizes a student without exposing full profile data.
@@ -65,6 +76,8 @@ func NewSubmissionResponse(model models.Submission) SubmissionResponse {
 		Status:       model.Status,
 		Grade:        model.Grade,
 		Feedback:     model.Feedback,
+		GradedBy:     model.GradedBy,
+		GradedAt:     model.GradedAt,
 		CreatedAt:    model.CreatedAt,
 		UpdatedAt:    model.UpdatedAt,
 	}
@@ -83,6 +96,19 @@ func NewSubmissionResponse(model models.Submission) SubmissionResponse {
 			Name:  model.Student.Name,
 			Email: model.Student.Email,
 		}
+	}
+
+	if len(model.History) > 0 {
+		history := make([]SubmissionGradeHistoryResponse, 0, len(model.History))
+		for _, entry := range model.History {
+			history = append(history, SubmissionGradeHistoryResponse{
+				Score:    entry.Score,
+				Feedback: entry.Feedback,
+				GradedBy: entry.GradedBy,
+				GradedAt: entry.GradedAt,
+			})
+		}
+		response.History = history
 	}
 
 	return response

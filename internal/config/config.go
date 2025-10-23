@@ -23,6 +23,7 @@ type Config struct {
 	CloudinaryAPISecret    string
 	CloudinaryUploadFolder string
 	DashboardCacheTTL      time.Duration
+	AnalyticsCacheTTL      time.Duration
 	DockerHost             string
 	ExecutionTimeout       time.Duration
 	CodeRunMemoryMB        int
@@ -55,6 +56,7 @@ func Load() (Config, error) {
 	v.SetDefault("app.port", "8080")
 	v.SetDefault("cloudinary.folder", "gema/tutorial")
 	v.SetDefault("dashboard.cache_ttl", "5m")
+	v.SetDefault("analytics.cache_ttl", "2m")
 	v.SetDefault("execution_timeout_ms", 5000)
 	v.SetDefault("code_run_memory_mb", 256)
 	v.SetDefault("code_run_cpu_shares", 512)
@@ -68,6 +70,16 @@ func Load() (Config, error) {
 	ttl, err := time.ParseDuration(ttlString)
 	if err != nil {
 		return Config{}, fmt.Errorf("invalid dashboard cache ttl: %w", err)
+	}
+
+	analyticsTTLString := v.GetString("analytics.cache_ttl")
+	if analyticsTTLString == "" {
+		analyticsTTLString = "2m"
+	}
+
+	analyticsTTL, err := time.ParseDuration(analyticsTTLString)
+	if err != nil {
+		return Config{}, fmt.Errorf("invalid analytics cache ttl: %w", err)
 	}
 
 	timeoutMs := v.GetInt("execution_timeout_ms")
@@ -88,6 +100,7 @@ func Load() (Config, error) {
 		CloudinaryAPISecret:    v.GetString("cloudinary.api_secret"),
 		CloudinaryUploadFolder: v.GetString("cloudinary.folder"),
 		DashboardCacheTTL:      ttl,
+		AnalyticsCacheTTL:      analyticsTTL,
 		DockerHost:             v.GetString("docker_host"),
 		ExecutionTimeout:       time.Duration(timeoutMs) * time.Millisecond,
 		CodeRunMemoryMB:        v.GetInt("code_run_memory_mb"),

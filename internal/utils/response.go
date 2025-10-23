@@ -15,7 +15,19 @@ func SendSuccess(c *fiber.Ctx, message string, data interface{}) error {
 		message = "success"
 	}
 
-	return c.Status(fiber.StatusOK).JSON(APIResponse{
+	return SendSuccessWithStatus(c, fiber.StatusOK, message, data)
+}
+
+// SendSuccessWithStatus sends a success payload using the provided HTTP status code.
+func SendSuccessWithStatus(c *fiber.Ctx, status int, message string, data interface{}) error {
+	if message == "" {
+		message = "success"
+	}
+	if status == 0 {
+		status = fiber.StatusOK
+	}
+
+	return c.Status(status).JSON(APIResponse{
 		Success: true,
 		Data:    data,
 		Message: message,

@@ -65,6 +65,24 @@ Phase 3 introduces the Web Lab for HTML/CSS/JS assignments. Students can retriev
 | GET    | `/api/v2/web-lab/assignments/:id`  | Retrieve a single assignment        |
 | POST   | `/api/v2/web-lab/submissions`      | Upload a `.zip` submission (JWT required) |
 
+### Admin API Endpoints
+
+All administrative routes require a valid JWT with the `admin` or `teacher` role. Responses follow the standardized envelope (`success`, `message`, and `data`).
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/admin/students` | Paginated student directory with search & filters |
+| GET | `/api/admin/students/:id` | Retrieve a single student profile |
+| PATCH | `/api/admin/students/:id` | Update student metadata, flags, and status |
+| DELETE | `/api/admin/students/:id` | Soft-delete a student with audit logging |
+| POST | `/api/admin/assignments` | Create tutorial assignments with rubric & max score |
+| PATCH | `/api/admin/assignments/:id` | Update assignment metadata |
+| DELETE | `/api/admin/assignments/:id` | Delete an assignment (cascades submissions) |
+| PATCH | `/api/admin/submissions/:id/grade` | Grade or re-grade a submission (idempotent) |
+| GET | `/api/admin/analytics` | Aggregated platform analytics with caching |
+| GET | `/api/admin/activities` | List administrative activity logs |
+| POST | `/api/admin/activities` | Manually append an activity log entry |
+
 Submission requests must use `multipart/form-data` with fields:
 
 | Field           | Type   | Notes                                                       |
