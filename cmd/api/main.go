@@ -56,6 +56,10 @@ func main() {
 		&models.Notification{},
 		&models.DiscussionThread{},
 		&models.DiscussionReply{},
+		&models.Announcement{},
+		&models.GalleryItem{},
+		&models.ContactSubmission{},
+		&models.UploadRecord{},
 	); err != nil {
 		log.Fatalf("failed to migrate database: %v", err)
 	}
@@ -94,6 +98,10 @@ func main() {
 	adminSubmissionRepo := repository.NewAdminSubmissionRepository(db)
 	activityRepo := repository.NewActivityLogRepository(db)
 	analyticsRepo := repository.NewAdminAnalyticsRepository(db)
+	announcementRepo := repository.NewAnnouncementRepository(db)
+	galleryRepo := repository.NewGalleryRepository(db)
+	contactRepo := repository.NewContactRepository(db)
+	uploadRepo := repository.NewUploadRepository(db)
 
 	studentRepo := repository.NewStudentRepository(db)
 	webAssignmentRepo := repository.NewWebAssignmentRepository(db)
@@ -118,6 +126,14 @@ func main() {
 	notificationService := service.NewNotificationService(notificationRepo, redisClient, cfg.RedisPubSubChannel, natsConn, validate, logger)
 	chatService := service.NewChatService(chatRepo, redisClient, cfg.RedisPubSubChannel, natsConn, validate, logger)
 	discussionService := service.NewDiscussionService(discussionRepo, notificationService, validate, logger)
+	activityFeedService := service.NewActivityFeedService(activityRepo, redisClient, 45*time.Second, logger)
+	announcementService := service.NewAnnouncementService(announcementRepo, redisClient, cfg.AnnouncementsCacheTTL, logger)
+	galleryService := service.NewGalleryService(galleryRepo, cfg.GalleryCDNBaseURL, logger)
+
+	contactDelivery := service.NewLogContactDelivery(logger)
+	contactService := service.NewContactService(contactRepo, redisClient, validate, contactDelivery, logger)
+	uploadService := service.NewUploadService(uploader, uploadRepo, cfg.UploadMaxMB, logger)
+	seedService := service.NewSeedService(announcementRepo, galleryRepo, cfg.SeedEnabled, cfg.SeedToken, logger)
 
 	serviceCtx, serviceCancel := context.WithCancel(context.Background())
 	chatService.Start(serviceCtx)
@@ -194,6 +210,12 @@ func main() {
 	chatHandler := handler.NewChatHandler(chatService, validate, logger)
 	notificationHandler := handler.NewNotificationHandler(notificationService, logger, cfg.SSEClientTimeout)
 	discussionHandler := handler.NewDiscussionHandler(discussionService, validate, logger)
+	activityFeedHandler := handler.NewActivityFeedHandler(activityFeedService, logger)
+	announcementHandler := handler.NewAnnouncementHandler(announcementService, logger)
+	galleryHandler := handler.NewGalleryHandler(galleryService, logger)
+	contactHandler := handler.NewContactHandler(contactService, logger)
+	uploadHandler := handler.NewUploadHandler(uploadService, logger)
+	seedHandler := handler.NewSeedHandler(seedService, logger)
 
 	// App & router
 	app := fiber.New(fiber.Config{
@@ -218,6 +240,12 @@ func main() {
 		ChatHandler:             chatHandler,
 		NotificationHandler:     notificationHandler,
 		DiscussionHandler:       discussionHandler,
+		ActivityFeedHandler:     activityFeedHandler,
+		AnnouncementHandler:     announcementHandler,
+		GalleryHandler:          galleryHandler,
+		ContactHandler:          contactHandler,
+		UploadHandler:           uploadHandler,
+		SeedHandler:             seedHandler,
 		JWTMiddleware:           middleware.JWTProtected(cfg.JWTSecret),
 	})
 

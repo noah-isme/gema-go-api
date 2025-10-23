@@ -27,6 +27,7 @@ type Config struct {
 	CloudinaryUploadFolder string
 	DashboardCacheTTL      time.Duration
 	AnalyticsCacheTTL      time.Duration
+	AnnouncementsCacheTTL  time.Duration
 	SSEClientTimeout       time.Duration
 	DockerHost             string
 	ExecutionTimeout       time.Duration
@@ -35,6 +36,11 @@ type Config struct {
 	AIProvider             string
 	OpenAIAPIKey           string
 	AnthropicAPIKey        string
+	UploadMaxMB            int
+	ContactInboxProvider   string
+	GalleryCDNBaseURL      string
+	SeedEnabled            bool
+	SeedToken              string
 }
 
 // HTTPAddress returns the address the HTTP server should listen on.
@@ -75,6 +81,7 @@ func Load() (Config, error) {
 	v.SetDefault("ws.port", "")
 	v.SetDefault("dashboard.cache_ttl", "5m")
 	v.SetDefault("analytics.cache_ttl", "2m")
+	v.SetDefault("announcements.cache_ttl", "5m")
 	v.SetDefault("sse.client_timeout", "55s")
 	v.SetDefault("execution_timeout_ms", 5000)
 	v.SetDefault("code_run_memory_mb", 256)
@@ -82,6 +89,11 @@ func Load() (Config, error) {
 	v.SetDefault("ai.provider", "openai")
 	v.SetDefault("redis.pubsub_channel", "gema:events")
 	v.SetDefault("nats.url", "")
+	v.SetDefault("upload.max_mb", 10)
+	v.SetDefault("contact.inbox_provider", "email")
+	v.SetDefault("gallery.cdn_baseurl", "")
+	v.SetDefault("seed.enabled", false)
+	v.SetDefault("seed.token", "")
 
 	ttlString := v.GetString("dashboard.cache_ttl")
 	if ttlString == "" {
@@ -101,6 +113,16 @@ func Load() (Config, error) {
 	analyticsTTL, err := time.ParseDuration(analyticsTTLString)
 	if err != nil {
 		return Config{}, fmt.Errorf("invalid analytics cache ttl: %w", err)
+	}
+
+	announcementsTTLString := v.GetString("announcements.cache_ttl")
+	if announcementsTTLString == "" {
+		announcementsTTLString = "5m"
+	}
+
+	announcementsTTL, err := time.ParseDuration(announcementsTTLString)
+	if err != nil {
+		return Config{}, fmt.Errorf("invalid announcements cache ttl: %w", err)
 	}
 
 	sseTimeoutString := v.GetString("sse.client_timeout")
@@ -135,6 +157,7 @@ func Load() (Config, error) {
 		CloudinaryUploadFolder: v.GetString("cloudinary.folder"),
 		DashboardCacheTTL:      ttl,
 		AnalyticsCacheTTL:      analyticsTTL,
+		AnnouncementsCacheTTL:  announcementsTTL,
 		SSEClientTimeout:       sseTimeout,
 		DockerHost:             v.GetString("docker_host"),
 		ExecutionTimeout:       time.Duration(timeoutMs) * time.Millisecond,
@@ -143,6 +166,11 @@ func Load() (Config, error) {
 		AIProvider:             strings.ToLower(v.GetString("ai.provider")),
 		OpenAIAPIKey:           v.GetString("openai_api_key"),
 		AnthropicAPIKey:        v.GetString("anthropic_api_key"),
+		UploadMaxMB:            v.GetInt("upload.max_mb"),
+		ContactInboxProvider:   strings.ToLower(v.GetString("contact.inbox_provider")),
+		GalleryCDNBaseURL:      strings.TrimRight(v.GetString("gallery.cdn_baseurl"), "/"),
+		SeedEnabled:            v.GetBool("seed.enabled"),
+		SeedToken:              v.GetString("seed.token"),
 	}
 
 	if cfg.JWTSecret == "" || cfg.JWTRefreshSecret == "" {
@@ -155,6 +183,10 @@ func Load() (Config, error) {
 
 	if cfg.CodeRunCPUShares <= 0 {
 		cfg.CodeRunCPUShares = 512
+	}
+
+	if cfg.UploadMaxMB <= 0 {
+		cfg.UploadMaxMB = 10
 	}
 
 	return cfg, nil

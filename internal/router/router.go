@@ -26,6 +26,12 @@ type Dependencies struct {
 	ChatHandler             *handler.ChatHandler
 	NotificationHandler     *handler.NotificationHandler
 	DiscussionHandler       *handler.DiscussionHandler
+	ActivityFeedHandler     *handler.ActivityFeedHandler
+	AnnouncementHandler     *handler.AnnouncementHandler
+	GalleryHandler          *handler.GalleryHandler
+	ContactHandler          *handler.ContactHandler
+	UploadHandler           *handler.UploadHandler
+	SeedHandler             *handler.SeedHandler
 	JWTMiddleware           fiber.Handler
 }
 
@@ -124,4 +130,34 @@ func Register(app *fiber.App, cfg config.Config, deps Dependencies) {
 			deps.AdminActivityHandler.Register(activityGroup)
 		}
 	}
+	if deps.ActivityFeedHandler != nil {
+		activities := app.Group("/api/activities")
+		deps.ActivityFeedHandler.Register(activities)
+	}
+
+	if deps.AnnouncementHandler != nil {
+		announcements := app.Group("/api/announcements")
+		deps.AnnouncementHandler.Register(announcements)
+	}
+
+	if deps.GalleryHandler != nil {
+		gallery := app.Group("/api/gallery")
+		deps.GalleryHandler.Register(gallery)
+	}
+
+	if deps.ContactHandler != nil {
+		contact := app.Group("/api/contact", jwtMiddleware, middleware.RateLimit("contact", 5, time.Minute))
+		deps.ContactHandler.Register(contact)
+	}
+
+	if deps.UploadHandler != nil {
+		upload := app.Group("/api/upload", jwtMiddleware, middleware.RequireRole("student", "teacher", "admin"), middleware.RateLimit("upload", 3, time.Minute))
+		deps.UploadHandler.Register(upload)
+	}
+
+	if deps.SeedHandler != nil {
+		seed := app.Group("/api/seed", jwtMiddleware, middleware.RequireRole("admin"), middleware.RateLimit("seed", 1, time.Minute))
+		deps.SeedHandler.Register(seed)
+	}
+
 }
