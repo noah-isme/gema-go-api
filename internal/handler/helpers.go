@@ -2,6 +2,7 @@ package handler
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -56,6 +57,25 @@ func userRoleFromContext(c *fiber.Ctx) string {
 	if v := c.Locals("user_role"); v != nil {
 		if role, ok := v.(string); ok {
 			return role
+		}
+	}
+	return ""
+}
+
+func userIDStringFromContext(c *fiber.Ctx) string {
+	if v := c.Locals("user_id"); v != nil {
+		switch id := v.(type) {
+		case uint:
+			return strconv.FormatUint(uint64(id), 10)
+		case int:
+			if id < 0 {
+				return ""
+			}
+			return strconv.Itoa(id)
+		case string:
+			return strings.TrimSpace(id)
+		case fmt.Stringer:
+			return strings.TrimSpace(id.String())
 		}
 	}
 	return ""

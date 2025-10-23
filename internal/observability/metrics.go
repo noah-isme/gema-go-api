@@ -7,10 +7,14 @@ import (
 )
 
 var (
-	registerOnce        sync.Once
-	adminRequestsTotal  *prometheus.CounterVec
-	adminLatencySeconds *prometheus.HistogramVec
-	adminErrorsTotal    *prometheus.CounterVec
+	registerOnce                sync.Once
+	adminRequestsTotal          *prometheus.CounterVec
+	adminLatencySeconds         *prometheus.HistogramVec
+	adminErrorsTotal            *prometheus.CounterVec
+	chatConnectionsTotal        prometheus.Counter
+	chatMessagesSent            *prometheus.CounterVec
+	sseClientsActive            prometheus.Gauge
+	notificationsPublishedTotal *prometheus.CounterVec
 )
 
 // RegisterMetrics initialises the Prometheus collectors used for admin observability.
@@ -32,7 +36,35 @@ func RegisterMetrics() {
 			Help: "Total number of error responses returned by admin endpoints.",
 		}, []string{"method", "route", "status"})
 
-		prometheus.MustRegister(adminRequestsTotal, adminLatencySeconds, adminErrorsTotal)
+		chatConnectionsTotal = prometheus.NewCounter(prometheus.CounterOpts{
+			Name: "chat_connections_total",
+			Help: "Total number of websocket chat connections established.",
+		})
+
+		chatMessagesSent = prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "chat_messages_sent",
+			Help: "Total chat messages sent segmented by type.",
+		}, []string{"type"})
+
+		sseClientsActive = prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "sse_clients_active",
+			Help: "Number of active SSE clients streaming notifications.",
+		})
+
+		notificationsPublishedTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "notifications_published_total",
+			Help: "Total number of notifications published segmented by type.",
+		}, []string{"type"})
+
+		prometheus.MustRegister(
+			adminRequestsTotal,
+			adminLatencySeconds,
+			adminErrorsTotal,
+			chatConnectionsTotal,
+			chatMessagesSent,
+			sseClientsActive,
+			notificationsPublishedTotal,
+		)
 	})
 }
 
@@ -52,4 +84,28 @@ func AdminLatency() *prometheus.HistogramVec {
 func AdminErrors() *prometheus.CounterVec {
 	RegisterMetrics()
 	return adminErrorsTotal
+}
+
+// ChatConnectionsTotal exposes the chat connection counter.
+func ChatConnectionsTotal() prometheus.Counter {
+	RegisterMetrics()
+	return chatConnectionsTotal
+}
+
+// ChatMessagesSent exposes the chat messages counter vector.
+func ChatMessagesSent() *prometheus.CounterVec {
+	RegisterMetrics()
+	return chatMessagesSent
+}
+
+// SSEClientsActive exposes the gauge tracking active SSE clients.
+func SSEClientsActive() prometheus.Gauge {
+	RegisterMetrics()
+	return sseClientsActive
+}
+
+// NotificationsPublishedTotal exposes the notifications counter vector.
+func NotificationsPublishedTotal() *prometheus.CounterVec {
+	RegisterMetrics()
+	return notificationsPublishedTotal
 }
