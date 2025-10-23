@@ -1,0 +1,1030 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "GEMA Labs API",
+    "version": "1.0.0",
+    "description": "Student-facing endpoints for Coding Lab and Web Lab experiences in the GEMA LMS. All routes require a valid JWT access token and respond using the `{ success, message, data }` envelope."
+  },
+  "servers": [
+    {
+      "url": "https://api.gema.dev",
+      "description": "Production"
+    },
+    {
+      "url": "https://staging.api.gema.dev",
+      "description": "Staging"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Coding Lab Tasks",
+      "description": "Retrieve coding lab tasks"
+    },
+    {
+      "name": "Coding Lab Submissions",
+      "description": "Create, view, and evaluate coding submissions"
+    },
+    {
+      "name": "Web Lab Assignments",
+      "description": "Retrieve available web lab assignments"
+    },
+    {
+      "name": "Web Lab Submissions",
+      "description": "Upload and review web lab submissions"
+    }
+  ],
+  "paths": {
+    "/api/v2/coding-lab/tasks": {
+      "get": {
+        "summary": "List coding tasks",
+        "tags": [
+          "Coding Lab Tasks"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "language",
+            "in": "query",
+            "description": "Filter by primary language (e.g. python, javascript, go).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "difficulty",
+            "in": "query",
+            "description": "Filter by difficulty label (beginner, intermediate, advanced).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tags",
+            "in": "query",
+            "description": "Comma-separated tags to filter tasks (e.g. arrays,loops).",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "style": "form",
+            "explode": false
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "description": "Full-text search against task titles and prompts.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Page number (default 1).",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "description": "Number of items per page (default 20, max 100).",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Coding tasks retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodingTaskListEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/v2/coding-lab/tasks/{id}": {
+      "get": {
+        "summary": "Retrieve a coding task",
+        "tags": [
+          "Coding Lab Tasks"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Coding task retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodingTaskEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/v2/coding-lab/submissions": {
+      "post": {
+        "summary": "Submit code for evaluation",
+        "tags": [
+          "Coding Lab Submissions"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodingSubmissionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Submission created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodingSubmissionEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/v2/coding-lab/submissions/{id}": {
+      "get": {
+        "summary": "Get a coding submission",
+        "tags": [
+          "Coding Lab Submissions"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Submission retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodingSubmissionEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/v2/coding-lab/submissions/{id}/evaluate": {
+      "post": {
+        "summary": "Trigger AI evaluation for a submission",
+        "tags": [
+          "Coding Lab Submissions"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Evaluation stored",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodingEvaluationEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/v2/web-lab/assignments": {
+      "get": {
+        "summary": "List web lab assignments",
+        "tags": [
+          "Web Lab Assignments"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Assignments retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebAssignmentListEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/v2/web-lab/assignments/{id}": {
+      "get": {
+        "summary": "Retrieve a web lab assignment",
+        "tags": [
+          "Web Lab Assignments"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Assignment retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebAssignmentEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/v2/web-lab/submissions": {
+      "post": {
+        "summary": "Upload a web lab submission",
+        "tags": [
+          "Web Lab Submissions"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "assignment_id",
+                  "file"
+                ],
+                "properties": {
+                  "assignment_id": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Target assignment identifier"
+                  },
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "ZIP archive ≤ 10 MB containing the submission"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Submission processed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebSubmissionEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "ResponseEnvelopeBase": {
+        "type": "object",
+        "required": [
+          "success",
+          "message"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {}
+        }
+      },
+      "Pagination": {
+        "type": "object",
+        "required": [
+          "page",
+          "page_size",
+          "total_items"
+        ],
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "page_size": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "total_items": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "CodingTask": {
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "prompt",
+          "language",
+          "difficulty",
+          "tags",
+          "starter_code",
+          "expected_output"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "starter_code": {
+            "type": "string"
+          },
+          "language": {
+            "type": "string",
+            "example": "python"
+          },
+          "difficulty": {
+            "type": "string",
+            "example": "intermediate"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "expected_output": {
+            "type": "string"
+          }
+        }
+      },
+      "CodingTaskList": {
+        "type": "object",
+        "required": [
+          "items",
+          "pagination"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CodingTask"
+            }
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        }
+      },
+      "CodingTaskEnvelope": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ResponseEnvelopeBase"
+          },
+          {
+            "type": "object",
+            "required": [
+              "data"
+            ],
+            "properties": {
+              "data": {
+                "$ref": "#/components/schemas/CodingTask"
+              }
+            }
+          }
+        ]
+      },
+      "CodingTaskListEnvelope": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ResponseEnvelopeBase"
+          },
+          {
+            "type": "object",
+            "required": [
+              "data"
+            ],
+            "properties": {
+              "data": {
+                "$ref": "#/components/schemas/CodingTaskList"
+              }
+            }
+          }
+        ]
+      },
+      "CodingSubmissionRequest": {
+        "type": "object",
+        "required": [
+          "task_id",
+          "language",
+          "source"
+        ],
+        "properties": {
+          "task_id": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "language": {
+            "type": "string",
+            "description": "Execution language",
+            "enum": [
+              "python",
+              "javascript",
+              "go"
+            ]
+          },
+          "source": {
+            "type": "string",
+            "description": "Source code to execute",
+            "minLength": 1
+          }
+        }
+      },
+      "CodingEvaluation": {
+        "type": "object",
+        "required": [
+          "id",
+          "score",
+          "verdict",
+          "feedback",
+          "details",
+          "raw",
+          "provider"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "score": {
+            "type": "number",
+            "format": "double"
+          },
+          "verdict": {
+            "type": "string"
+          },
+          "feedback": {
+            "type": "string"
+          },
+          "details": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "raw": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "provider": {
+            "type": "string",
+            "example": "openai"
+          }
+        }
+      },
+      "CodingSubmission": {
+        "type": "object",
+        "required": [
+          "id",
+          "task_id",
+          "student_id",
+          "language",
+          "status",
+          "output",
+          "error",
+          "cpu_time_ms",
+          "memory_kb",
+          "task",
+          "evaluations"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "task_id": {
+            "type": "integer"
+          },
+          "student_id": {
+            "type": "integer"
+          },
+          "language": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "completed",
+              "failed",
+              "timeout",
+              "evaluated"
+            ]
+          },
+          "output": {
+            "type": "string"
+          },
+          "error": {
+            "type": "string"
+          },
+          "cpu_time_ms": {
+            "type": "integer"
+          },
+          "memory_kb": {
+            "type": "integer"
+          },
+          "task": {
+            "$ref": "#/components/schemas/CodingTask"
+          },
+          "evaluations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CodingEvaluation"
+            }
+          }
+        }
+      },
+      "CodingSubmissionEnvelope": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ResponseEnvelopeBase"
+          },
+          {
+            "type": "object",
+            "required": [
+              "data"
+            ],
+            "properties": {
+              "data": {
+                "$ref": "#/components/schemas/CodingSubmission"
+              }
+            }
+          }
+        ]
+      },
+      "CodingEvaluationEnvelope": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ResponseEnvelopeBase"
+          },
+          {
+            "type": "object",
+            "required": [
+              "data"
+            ],
+            "properties": {
+              "data": {
+                "$ref": "#/components/schemas/CodingEvaluation"
+              }
+            }
+          }
+        ]
+      },
+      "WebAssignment": {
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "requirements",
+          "assets",
+          "rubric",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          },
+          "requirements": {
+            "type": "string"
+          },
+          "assets": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          "rubric": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "WebAssignmentEnvelope": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ResponseEnvelopeBase"
+          },
+          {
+            "type": "object",
+            "required": [
+              "data"
+            ],
+            "properties": {
+              "data": {
+                "$ref": "#/components/schemas/WebAssignment"
+              }
+            }
+          }
+        ]
+      },
+      "WebAssignmentListEnvelope": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ResponseEnvelopeBase"
+          },
+          {
+            "type": "object",
+            "required": [
+              "data"
+            ],
+            "properties": {
+              "data": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/WebAssignment"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "WebSubmission": {
+        "type": "object",
+        "required": [
+          "id",
+          "assignment_id",
+          "student_id",
+          "zip_url",
+          "status",
+          "feedback",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "assignment_id": {
+            "type": "integer"
+          },
+          "student_id": {
+            "type": "integer"
+          },
+          "zip_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "validated",
+              "rejected"
+            ]
+          },
+          "feedback": {
+            "type": "string"
+          },
+          "score": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "assignment": {
+            "$ref": "#/components/schemas/WebAssignment"
+          }
+        }
+      },
+      "WebSubmissionEnvelope": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ResponseEnvelopeBase"
+          },
+          {
+            "type": "object",
+            "required": [
+              "data"
+            ],
+            "properties": {
+              "data": {
+                "$ref": "#/components/schemas/WebSubmission"
+              }
+            }
+          }
+        ]
+      },
+      "ErrorEnvelope": {
+        "type": "object",
+        "required": [
+          "success",
+          "message"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              false
+            ]
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Bad request",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            },
+            "examples": {
+              "validation": {
+                "value": {
+                  "success": false,
+                  "message": "invalid request body"
+                }
+              }
+            }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "Unauthorized",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "Forbidden",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Resource not found",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "PayloadTooLarge": {
+        "description": "Payload too large",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "ServiceUnavailable": {
+        "description": "Service unavailable",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "InternalError": {
+        "description": "Internal server error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      }
+    }
+  }
+}

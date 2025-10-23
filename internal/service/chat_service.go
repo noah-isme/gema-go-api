@@ -451,12 +451,14 @@ func (c *chatClient) reader() {
 	for {
 		var payload dto.ChatSendRequest
 		if err := c.conn.ReadJSON(&payload); err != nil {
+			observability.RealtimeErrorsTotal().WithLabelValues("chat", "read").Inc()
 			c.service.logger.Debug().Err(err).Msg("chat read loop ended")
 			return
 		}
 
 		response, err := c.service.processSend(connCtx, c, correlation, payload)
 		if err != nil {
+			observability.RealtimeErrorsTotal().WithLabelValues("chat", "process").Inc()
 			c.service.logger.Warn().Err(err).Msg("failed to process chat message")
 			continue
 		}
@@ -485,11 +487,13 @@ func (c *chatClient) writer() {
 				return
 			}
 			if err := c.conn.WriteJSON(message); err != nil {
+				observability.RealtimeErrorsTotal().WithLabelValues("chat", "write").Inc()
 				c.service.logger.Debug().Err(err).Msg("chat write loop terminated")
 				return
 			}
 		case <-time.After(30 * time.Second):
 			if err := c.conn.WriteMessage(websocket.PingMessage, []byte("keepalive")); err != nil {
+				observability.RealtimeErrorsTotal().WithLabelValues("chat", "ping").Inc()
 				c.service.logger.Debug().Err(err).Msg("chat ping failed")
 				return
 			}
@@ -503,6 +507,7 @@ func (c *chatClient) close() {
 	c.once.Do(func() {
 		close(c.closed)
 		c.service.hub.unregister(c)
+		observability.ChatDisconnectsTotal().Inc()
 		_ = c.conn.Close()
 	})
 }

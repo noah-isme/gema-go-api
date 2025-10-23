@@ -1,0 +1,44 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: gema-realtime-alerts
+  labels:
+    app.kubernetes.io/name: gema-api
+    app.kubernetes.io/component: realtime
+spec:
+  groups:
+    - name: realtime-streaming
+      rules:
+        - alert: GemaRealtimeErrorRateHigh
+          expr: (
+            sum(increase(realtime_errors_total[5m]))
+            /
+            clamp_min(
+              sum(increase(chat_messages_sent[5m])) + sum(increase(notifications_published_total[5m])),
+              1
+            )
+          ) > 0.01
+          for: 5m
+          labels:
+            severity: critical
+            service: realtime
+          annotations:
+            summary: Realtime streaming error rate above 1%
+            description: >-
+              Over the last 5 minutes the realtime streaming error ratio was {{ humanizePercentage $value }}.
+              Inspect chat_service and notification_service logs, and verify Redis/NATS brokers.
+        - alert: GemaChatDisconnectRateHigh
+          expr: (
+            increase(chat_disconnects_total[10m])
+            /
+            clamp_min(increase(chat_connections_total[10m]), 1)
+          ) > 0.05
+          for: 10m
+          labels:
+            severity: warning
+            service: chat
+          annotations:
+            summary: Chat client disconnect rate above 5%
+            description: >-
+              Chat disconnect ratio reached {{ humanizePercentage $value }} during the last 10 minutes.
+              Validate websocket health probes, JWT freshness, and upstream broker stability.

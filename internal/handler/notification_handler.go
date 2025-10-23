@@ -12,6 +12,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/noah-isme/gema-go-api/internal/middleware"
+	"github.com/noah-isme/gema-go-api/internal/observability"
 	"github.com/noah-isme/gema-go-api/internal/service"
 	"github.com/noah-isme/gema-go-api/internal/utils"
 )
@@ -109,11 +110,13 @@ func (h *NotificationHandler) stream(c *fiber.Ctx) error {
 					return
 				}
 				if err := writeNotificationEvent(w, notification); err != nil {
+					observability.RealtimeErrorsTotal().WithLabelValues("notifications", "write").Inc()
 					h.logger.Debug().Err(err).Msg("failed to write notification event")
 					return
 				}
 			case <-ticker.C:
 				if err := writeKeepAlive(w); err != nil {
+					observability.RealtimeErrorsTotal().WithLabelValues("notifications", "keepalive").Inc()
 					h.logger.Debug().Err(err).Msg("failed to write notification keepalive")
 					return
 				}
