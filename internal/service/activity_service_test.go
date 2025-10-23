@@ -27,6 +27,10 @@ func (m *memoryActivityRepo) List(ctx context.Context, filter repository.Activit
 	return append([]models.ActivityLog(nil), m.entries...), int64(len(m.entries)), nil
 }
 
+func (m *memoryActivityRepo) ListRecent(ctx context.Context, filter repository.ActivityLogRecentFilter) ([]models.ActivityLog, int64, error) {
+	return append([]models.ActivityLog(nil), m.entries...), int64(len(m.entries)), nil
+}
+
 func TestActivityServiceRecordMasksEmail(t *testing.T) {
 	repo := &memoryActivityRepo{}
 	validate := validator.New(validator.WithRequiredStructEnabled())
