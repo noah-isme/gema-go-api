@@ -53,3 +53,35 @@ go fmt ./...
 go vet ./...
 ```
 
+## Web Lab Workflow
+
+Phase 3 introduces the Web Lab for HTML/CSS/JS assignments. Students can retrieve available assignments and upload a `.zip` archive that is automatically linted, scanned for dangerous files, uploaded to Cloudinary, and scored based on heuristic Lighthouse checks.
+
+### API Endpoints
+
+| Method | Path                               | Description                         |
+|--------|------------------------------------|-------------------------------------|
+| GET    | `/api/v2/web-lab/assignments`      | List available Web Lab assignments  |
+| GET    | `/api/v2/web-lab/assignments/:id`  | Retrieve a single assignment        |
+| POST   | `/api/v2/web-lab/submissions`      | Upload a `.zip` submission (JWT required) |
+
+Submission requests must use `multipart/form-data` with fields:
+
+| Field           | Type   | Notes                                                       |
+|-----------------|--------|-------------------------------------------------------------|
+| `assignment_id` | number | Target assignment ID                                        |
+| `file`          | file   | `.zip` archive ≤ 10 MB containing HTML, CSS, and JS sources |
+
+Example project archive layout:
+
+```
+landing-page.zip
+├── index.html
+├── styles/
+│   └── style.css
+└── scripts/
+    └── app.js
+```
+
+The service rejects executables (`.exe`) and symbolic links to harden the sandbox pipeline. For full request/response samples see [`docs/WEB-LAB-API.md`](docs/WEB-LAB-API.md).
+
