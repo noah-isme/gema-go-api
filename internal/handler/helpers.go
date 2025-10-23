@@ -1,10 +1,14 @@
 package handler
 
 import (
+	"errors"
 	"strconv"
 	"strings"
 
+	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
+
+	"github.com/noah-isme/gema-go-api/internal/service"
 )
 
 func splitAndTrim(input string) []string {
@@ -53,4 +57,16 @@ func userRoleFromContext(c *fiber.Ctx) string {
 		}
 	}
 	return ""
+}
+
+func activityActorFromContext(c *fiber.Ctx) service.ActivityActor {
+	return service.ActivityActor{
+		ID:   userIDFromContext(c),
+		Role: userRoleFromContext(c),
+	}
+}
+
+func isValidationError(err error) bool {
+	var validationErrors validator.ValidationErrors
+	return errors.As(err, &validationErrors)
 }

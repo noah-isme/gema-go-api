@@ -43,11 +43,13 @@ func main() {
 		&models.Student{},
 		&models.Assignment{},
 		&models.Submission{},
+		&models.SubmissionGradeHistory{},
 		&models.WebAssignment{},
 		&models.WebSubmission{},
 		&models.CodingTask{},
 		&models.CodingSubmission{},
 		&models.CodingEvaluation{},
+		&models.ActivityLog{},
 	); err != nil {
 		log.Fatalf("failed to migrate database: %v", err)
 	}
@@ -73,6 +75,10 @@ func main() {
 	// Repositori gabungan
 	assignmentRepo := repository.NewAssignmentRepository(db)
 	submissionRepo := repository.NewSubmissionRepository(db)
+	adminStudentRepo := repository.NewAdminStudentRepository(db)
+	adminSubmissionRepo := repository.NewAdminSubmissionRepository(db)
+	activityRepo := repository.NewActivityLogRepository(db)
+	analyticsRepo := repository.NewAdminAnalyticsRepository(db)
 
 	studentRepo := repository.NewStudentRepository(db)
 	webAssignmentRepo := repository.NewWebAssignmentRepository(db)
@@ -86,6 +92,11 @@ func main() {
 	submissionService := service.NewSubmissionService(submissionRepo, assignmentRepo, validate, uploader, logger)
 	dashboardService := service.NewStudentDashboardService(assignmentRepo, submissionRepo, redisClient, cfg.DashboardCacheTTL, logger)
 	webLabService := service.NewWebLabService(webAssignmentRepo, webSubmissionRepo, studentRepo, validate, uploader, logger)
+	activityService := service.NewActivityService(activityRepo, validate, logger)
+	adminStudentService := service.NewAdminStudentService(adminStudentRepo, validate, activityService, logger)
+	adminAssignmentService := service.NewAdminAssignmentService(assignmentRepo, validate, activityService, logger)
+	adminGradingService := service.NewAdminGradingService(adminSubmissionRepo, validate, activityService, logger)
+	adminAnalyticsService := service.NewAdminAnalyticsService(analyticsRepo, redisClient, cfg.AnalyticsCacheTTL, logger)
 
 	executor, err := dockerexec.NewDockerExecutor(dockerexec.Config{
 		Host:          cfg.DockerHost,
@@ -150,6 +161,11 @@ func main() {
 	webLabHandler := handler.NewWebLabHandler(webLabService, validate, logger)
 	codingTaskHandler := handler.NewCodingTaskHandler(codingTaskService, logger)
 	codingSubmissionHandler := handler.NewCodingSubmissionHandler(codingSubmissionService, validate, logger)
+	adminStudentHandler := handler.NewAdminStudentHandler(adminStudentService, logger)
+	adminAssignmentHandler := handler.NewAdminAssignmentHandler(adminAssignmentService, logger)
+	adminGradingHandler := handler.NewAdminGradingHandler(adminGradingService, logger)
+	adminAnalyticsHandler := handler.NewAdminAnalyticsHandler(adminAnalyticsService, logger)
+	adminActivityHandler := handler.NewAdminActivityHandler(activityService, logger)
 
 	// App & router
 	app := fiber.New(fiber.Config{
@@ -165,6 +181,11 @@ func main() {
 		WebLabHandler:           webLabHandler,
 		CodingTaskHandler:       codingTaskHandler,
 		CodingSubmissionHandler: codingSubmissionHandler,
+		AdminStudentHandler:     adminStudentHandler,
+		AdminAssignmentHandler:  adminAssignmentHandler,
+		AdminGradingHandler:     adminGradingHandler,
+		AdminAnalyticsHandler:   adminAnalyticsHandler,
+		AdminActivityHandler:    adminActivityHandler,
 		JWTMiddleware:           middleware.JWTProtected(cfg.JWTSecret),
 	})
 

@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/go-playground/validator/v10"
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
 
@@ -168,8 +167,4 @@ func newTestFileHeader(t *testing.T, name string, content []byte) *multipart.Fil
 	files := req.MultipartForm.File["file"]
 	require.Len(t, files, 1)
 	return files[0]
-}
-
-func testLogger() zerolog.Logger {
-	return zerolog.New(io.Discard)
 }

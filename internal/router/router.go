@@ -5,6 +5,7 @@ import (
 
 	"github.com/noah-isme/gema-go-api/internal/config"
 	"github.com/noah-isme/gema-go-api/internal/handler"
+	"github.com/noah-isme/gema-go-api/internal/middleware"
 )
 
 // Dependencies groups router dependencies for registration.
@@ -15,6 +16,11 @@ type Dependencies struct {
 	WebLabHandler           *handler.WebLabHandler
 	CodingTaskHandler       *handler.CodingTaskHandler
 	CodingSubmissionHandler *handler.CodingSubmissionHandler
+	AdminStudentHandler     *handler.AdminStudentHandler
+	AdminAssignmentHandler  *handler.AdminAssignmentHandler
+	AdminGradingHandler     *handler.AdminGradingHandler
+	AdminAnalyticsHandler   *handler.AdminAnalyticsHandler
+	AdminActivityHandler    *handler.AdminActivityHandler
 	JWTMiddleware           fiber.Handler
 }
 
@@ -68,5 +74,34 @@ func Register(app *fiber.App, cfg config.Config, deps Dependencies) {
 	if deps.StudentDashboardHandler != nil {
 		student := app.Group("/api/v2/student", jwtMiddleware)
 		deps.StudentDashboardHandler.Register(student)
+	}
+
+	if deps.AdminStudentHandler != nil || deps.AdminAssignmentHandler != nil || deps.AdminGradingHandler != nil || deps.AdminAnalyticsHandler != nil || deps.AdminActivityHandler != nil {
+		admin := app.Group("/api/admin", jwtMiddleware, middleware.RequireRole("admin", "teacher"))
+
+		if deps.AdminStudentHandler != nil {
+			studentGroup := admin.Group("/students")
+			deps.AdminStudentHandler.Register(studentGroup)
+		}
+
+		if deps.AdminAssignmentHandler != nil {
+			assignmentGroup := admin.Group("/assignments")
+			deps.AdminAssignmentHandler.Register(assignmentGroup)
+		}
+
+		if deps.AdminGradingHandler != nil {
+			submissionGroup := admin.Group("/submissions")
+			deps.AdminGradingHandler.Register(submissionGroup)
+		}
+
+		if deps.AdminAnalyticsHandler != nil {
+			analyticsGroup := admin.Group("/analytics")
+			deps.AdminAnalyticsHandler.Register(analyticsGroup)
+		}
+
+		if deps.AdminActivityHandler != nil {
+			activityGroup := admin.Group("/activities")
+			deps.AdminActivityHandler.Register(activityGroup)
+		}
 	}
 }
