@@ -17,6 +17,7 @@ import (
 	"github.com/noah-isme/gema-go-api/internal/handler"
 	"github.com/noah-isme/gema-go-api/internal/middleware"
 	"github.com/noah-isme/gema-go-api/internal/models"
+	"github.com/noah-isme/gema-go-api/internal/observability"
 	"github.com/noah-isme/gema-go-api/internal/repository"
 	"github.com/noah-isme/gema-go-api/internal/router"
 	"github.com/noah-isme/gema-go-api/internal/service"
@@ -173,7 +174,8 @@ func main() {
 		ServerHeader: cfg.AppName,
 	})
 
-	middleware.Register(app)
+	middleware.Register(app, middleware.Config{Logger: &logger})
+	app.Get("/metrics", observability.MetricsHandler())
 	router.Register(app, cfg, router.Dependencies{
 		AssignmentHandler:       assignmentHandler,
 		SubmissionHandler:       submissionHandler,

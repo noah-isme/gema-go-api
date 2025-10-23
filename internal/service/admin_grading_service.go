@@ -9,6 +9,9 @@ import (
 
 	"github.com/go-playground/validator/v10"
 	"github.com/rs/zerolog"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 	"gorm.io/gorm"
 
 	"github.com/noah-isme/gema-go-api/internal/dto"
@@ -47,15 +50,29 @@ func NewAdminGradingService(repo repository.AdminSubmissionRepository, validator
 }
 
 func (s *adminGradingService) Grade(ctx context.Context, submissionID uint, payload dto.AdminGradeSubmissionRequest, actor ActivityActor) (dto.SubmissionResponse, error) {
+	tracer := otel.Tracer("github.com/noah-isme/gema-go-api/internal/service/admin_grading")
+	ctx, span := tracer.Start(ctx, "grading.update")
+	span.SetAttributes(
+		attribute.Int64("grading.submission_id", int64(submissionID)),
+		attribute.Int64("grading.actor_id", int64(actor.ID)),
+	)
+	defer span.End()
+
 	if err := s.validator.Struct(payload); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "validation_failed")
 		return dto.SubmissionResponse{}, err
 	}
 
 	submission, err := s.repo.GetByID(ctx, submissionID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, "submission_not_found")
 			return dto.SubmissionResponse{}, ErrAdminSubmissionNotFound
 		}
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "submission_lookup_failed")
 		return dto.SubmissionResponse{}, err
 	}
 
@@ -65,7 +82,10 @@ func (s *adminGradingService) Grade(ctx context.Context, submissionID uint, payl
 	}
 
 	if payload.Score > maxScore+1e-9 {
-		return dto.SubmissionResponse{}, ErrScoreExceedsMax
+		err := ErrScoreExceedsMax
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "score_exceeds_max")
+		return dto.SubmissionResponse{}, err
 	}
 
 	payloadFeedback := strings.TrimSpace(payload.Feedback)
@@ -75,6 +95,7 @@ func (s *adminGradingService) Grade(ctx context.Context, submissionID uint, payl
 	isIdempotent := currentScore != nil && math.Abs(*currentScore-payload.Score) < 1e-6 && currentFeedback == payloadFeedback
 	if isIdempotent {
 		if submission.GradedBy != nil && *submission.GradedBy == actor.ID {
+			span.SetAttributes(attribute.Bool("grading.idempotent", true))
 			return dto.NewSubmissionResponse(submission), nil
 		}
 	}
@@ -89,6 +110,8 @@ func (s *adminGradingService) Grade(ctx context.Context, submissionID uint, payl
 	submission.GradedBy = &gradedBy
 
 	if err := s.repo.Update(ctx, &submission); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "submission_update_failed")
 		return dto.SubmissionResponse{}, err
 	}
 
@@ -101,6 +124,7 @@ func (s *adminGradingService) Grade(ctx context.Context, submissionID uint, payl
 	}
 	if err := s.repo.CreateHistory(ctx, &history); err != nil {
 		s.logger.Warn().Err(err).Uint("submission_id", submission.ID).Msg("failed to persist grading history")
+		span.RecordError(err)
 	}
 
 	if s.activity != nil {
@@ -119,6 +143,11 @@ func (s *adminGradingService) Grade(ctx context.Context, submissionID uint, payl
 			Metadata:   metadata,
 		})
 	}
+
+	span.SetAttributes(
+		attribute.Float64("grading.score", payload.Score),
+		attribute.String("grading.status", string(submission.Status)),
+	)
 
 	return dto.NewSubmissionResponse(submission), nil
 }

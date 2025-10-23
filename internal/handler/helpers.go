@@ -7,7 +7,9 @@ import (
 
 	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
+	"github.com/rs/zerolog"
 
+	"github.com/noah-isme/gema-go-api/internal/middleware"
 	"github.com/noah-isme/gema-go-api/internal/service"
 )
 
@@ -64,6 +66,16 @@ func activityActorFromContext(c *fiber.Ctx) service.ActivityActor {
 		ID:   userIDFromContext(c),
 		Role: userRoleFromContext(c),
 	}
+}
+
+func requestLogger(base zerolog.Logger, c *fiber.Ctx) *zerolog.Logger {
+	logger := base
+	if c != nil {
+		if correlation := middleware.GetCorrelationID(c); correlation != "" {
+			logger = base.With().Str("correlation_id", correlation).Logger()
+		}
+	}
+	return &logger
 }
 
 func isValidationError(err error) bool {

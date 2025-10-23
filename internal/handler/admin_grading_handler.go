@@ -52,7 +52,7 @@ func (h *AdminGradingHandler) grade(c *fiber.Ctx) error {
 		case isValidationError(err):
 			return utils.SendError(c, fiber.StatusBadRequest, err.Error())
 		default:
-			h.logger.Error().Err(err).Uint("submission_id", id).Msg("failed to grade submission")
+			requestLogger(h.logger, c).Error().Err(err).Uint("submission_id", id).Msg("failed to grade submission")
 			return utils.SendError(c, fiber.StatusInternalServerError, "failed to grade submission")
 		}
 	}

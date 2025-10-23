@@ -8,6 +8,9 @@ import (
 
 	"github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 
 	"github.com/noah-isme/gema-go-api/internal/dto"
 	"github.com/noah-isme/gema-go-api/internal/models"
@@ -40,6 +43,10 @@ func NewAdminAnalyticsService(repo repository.AdminAnalyticsRepository, cache *r
 
 func (s *adminAnalyticsService) GetSummary(ctx context.Context) (dto.AdminAnalyticsResponse, error) {
 	const cacheKey = "analytics:summary"
+	tracer := otel.Tracer("github.com/noah-isme/gema-go-api/internal/service/admin_analytics")
+	ctx, span := tracer.Start(ctx, "analytics.aggregate")
+	span.SetAttributes(attribute.String("analytics.cache_key", cacheKey))
+	defer span.End()
 
 	if s.cache != nil {
 		cached, err := s.cache.Get(ctx, cacheKey).Result()
@@ -47,30 +54,41 @@ func (s *adminAnalyticsService) GetSummary(ctx context.Context) (dto.AdminAnalyt
 			var response dto.AdminAnalyticsResponse
 			if unmarshalErr := json.Unmarshal([]byte(cached), &response); unmarshalErr == nil {
 				response.CacheHit = true
+				span.SetAttributes(attribute.Bool("analytics.cache_hit", true))
 				return response, nil
 			}
 		} else if err != redis.Nil {
 			s.logger.Warn().Err(err).Msg("failed to read analytics cache")
+			span.RecordError(err)
 		}
 	}
 
 	activeCount, err := s.repo.CountActiveStudents(ctx)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "count_active_students_failed")
 		return dto.AdminAnalyticsResponse{}, err
 	}
 
 	submissions, err := s.repo.ListSubmissionsWithAssignments(ctx)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "list_submissions_failed")
 		return dto.AdminAnalyticsResponse{}, err
 	}
 
 	summary := s.buildSummary(activeCount, submissions)
+	span.SetAttributes(
+		attribute.Int64("analytics.active_students", activeCount),
+		attribute.Int("analytics.submission_count", len(submissions)),
+	)
 
 	if s.cache != nil {
 		payload, err := json.Marshal(summary)
 		if err == nil {
 			if err := s.cache.Set(ctx, cacheKey, payload, s.cacheTTL).Err(); err != nil {
 				s.logger.Warn().Err(err).Msg("failed to store analytics cache")
+				span.RecordError(err)
 			}
 		}
 	}

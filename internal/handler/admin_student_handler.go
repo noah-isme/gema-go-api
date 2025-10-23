@@ -63,7 +63,7 @@ func (h *AdminStudentHandler) list(c *fiber.Ctx) error {
 
 	response, err := h.service.List(c.Context(), req)
 	if err != nil {
-		h.logger.Error().Err(err).Msg("failed to list students")
+		requestLogger(h.logger, c).Error().Err(err).Msg("failed to list students")
 		return utils.SendError(c, fiber.StatusInternalServerError, "failed to list students")
 	}
 
@@ -81,7 +81,7 @@ func (h *AdminStudentHandler) get(c *fiber.Ctx) error {
 		if errors.Is(err, service.ErrAdminStudentNotFound) {
 			return utils.SendError(c, fiber.StatusNotFound, "student not found")
 		}
-		h.logger.Error().Err(err).Msg("failed to fetch student")
+		requestLogger(h.logger, c).Error().Err(err).Msg("failed to fetch student")
 		return utils.SendError(c, fiber.StatusInternalServerError, "failed to fetch student")
 	}
 
@@ -108,7 +108,7 @@ func (h *AdminStudentHandler) update(c *fiber.Ctx) error {
 		case isValidationError(err):
 			return utils.SendError(c, fiber.StatusBadRequest, err.Error())
 		default:
-			h.logger.Error().Err(err).Msg("failed to update student")
+			requestLogger(h.logger, c).Error().Err(err).Msg("failed to update student")
 			return utils.SendError(c, fiber.StatusInternalServerError, "failed to update student")
 		}
 	}
@@ -127,7 +127,7 @@ func (h *AdminStudentHandler) delete(c *fiber.Ctx) error {
 		if errors.Is(err, service.ErrAdminStudentNotFound) {
 			return utils.SendError(c, fiber.StatusNotFound, "student not found")
 		}
-		h.logger.Error().Err(err).Msg("failed to delete student")
+		requestLogger(h.logger, c).Error().Err(err).Msg("failed to delete student")
 		return utils.SendError(c, fiber.StatusInternalServerError, "failed to delete student")
 	}
 

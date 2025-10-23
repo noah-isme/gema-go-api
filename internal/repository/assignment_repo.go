@@ -53,5 +53,12 @@ func (r *assignmentRepository) Update(ctx context.Context, assignment *models.As
 }
 
 func (r *assignmentRepository) Delete(ctx context.Context, id uint) error {
-	return r.db.WithContext(ctx).Delete(&models.Assignment{}, id).Error
+	result := r.db.WithContext(ctx).Delete(&models.Assignment{}, id)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }
