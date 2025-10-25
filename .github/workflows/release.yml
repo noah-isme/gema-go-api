@@ -63,55 +63,31 @@ jobs:
             core.info(`Using target SHA: ${targetSha}`);
             core.info(`Preparing refs for version: ${version}`);
 
-            async function ensureBranch(ref) {
+            async function ensureRef(ref) {
               const apiRef = ref.replace(/^refs\//, '');
               try {
                 await github.rest.git.getRef({ owner, repo, ref: apiRef });
-                core.info(`Branch ref already exists: ${ref} – skipping creation.`);
+                core.info(`Ref already exists: ${ref} – skipping creation.`);
                 return { created: false, ref };
               } catch (error) {
                 if (error.status === 404) {
-                  core.info(`Creating branch ref ${ref} -> ${targetSha}`);
+                  core.info(`Creating ref ${ref} -> ${targetSha}`);
                   await github.rest.git.createRef({ owner, repo, ref, sha: targetSha });
                   return { created: true, ref };
                 }
-                core.warning(`Failed to check branch ref ${ref}: ${error.message}`);
-                throw error;
-              }
-            }
-
-            async function ensureTag(ref) {
-              const apiRef = ref.replace(/^refs\//, '');
-              try {
-                await github.rest.git.getRef({ owner, repo, ref: apiRef });
-                core.info(`Tag exists → updating ${apiRef} -> ${targetSha}`);
-                await github.rest.git.updateRef({
-                  owner,
-                  repo,
-                  ref: apiRef,
-                  sha: targetSha,
-                  force: true,
-                });
-                return { created: false, updated: true, ref };
-              } catch (error) {
-                if (error.status === 404) {
-                  core.info(`Tag not found → creating ${ref} -> ${targetSha}`);
-                  await github.rest.git.createRef({ owner, repo, ref, sha: targetSha });
-                  return { created: true, updated: false, ref };
-                }
-                core.warning(`Failed to ensure tag ${ref}: ${error.message}`);
+                core.warning(`Failed to check ref ${ref}: ${error.message}`);
                 throw error;
               }
             }
 
             const results = {};
             if (shouldCreateBranch) {
-              results.branch = await ensureBranch(branchRef);
+              results.branch = await ensureRef(branchRef);
             } else {
               core.info('Branch creation disabled via input.');
             }
             if (shouldCreateTag) {
-              results.tag = await ensureTag(tagRef);
+              results.tag = await ensureRef(tagRef);
             } else {
               core.info('Tag creation disabled via input.');
             }
@@ -120,7 +96,6 @@ jobs:
             core.setOutput('tag_ref', tagRef);
             core.setOutput('branch_created', shouldCreateBranch && results.branch?.created ? 'true' : 'false');
             core.setOutput('tag_created', shouldCreateTag && results.tag?.created ? 'true' : 'false');
-            core.setOutput('tag_updated', shouldCreateTag && results.tag?.updated ? 'true' : 'false');
 
       - name: Fallback create refs via gh api
         if: failure()
@@ -145,7 +120,7 @@ jobs:
           TAG_REF="refs/tags/${VERSION_SANITIZED}"
           TARGET_SHA_VALUE="${TARGET_SHA:-${GITHUB_SHA}}"
 
-          function ensure_branch() {
+          function ensure_ref() {
             local ref=$1
             local api_ref=${ref#refs/}
             set +e
@@ -153,10 +128,10 @@ jobs:
             local exists=$?
             set -e
             if [ "$exists" -eq 0 ]; then
-              echo "Branch ref already exists: ${ref} (gh api fallback)"
-              return 0
+              echo "Ref already exists: ${ref} (gh api fallback)"
+              return
             fi
-            echo "Creating branch via gh api: ${ref} -> ${TARGET_SHA_VALUE}"
+            echo "Creating ref via gh api: ${ref} -> ${TARGET_SHA_VALUE}"
             gh api \
               --method POST \
               -H "Accept: application/vnd.github+json" \
@@ -166,29 +141,13 @@ jobs:
           }
 
           if [ "${CREATE_BRANCH}" = "true" ]; then
-            ensure_branch "${BRANCH_REF}"
+            ensure_ref "${BRANCH_REF}"
           else
             echo "Branch creation disabled in fallback"
           fi
 
           if [ "${CREATE_TAG}" = "true" ]; then
-            if gh api "/repos/${GITHUB_REPOSITORY}/git/ref/tags/${VERSION_SANITIZED}" >/dev/null 2>&1; then
-              echo "Tag exists: ${TAG_REF} (gh api fallback) → updating"
-              gh api \
-                --method PATCH \
-                -H "Accept: application/vnd.github+json" \
-                "/repos/${GITHUB_REPOSITORY}/git/refs/tags/${VERSION_SANITIZED}" \
-                -f sha="${TARGET_SHA_VALUE}" \
-                -f force:=true
-            else
-              echo "Creating tag via gh api: ${TAG_REF} -> ${TARGET_SHA_VALUE}"
-              gh api \
-                --method POST \
-                -H "Accept: application/vnd.github+json" \
-                "/repos/${GITHUB_REPOSITORY}/git/refs" \
-                -f ref="${TAG_REF}" \
-                -f sha="${TARGET_SHA_VALUE}"
-            fi
+            ensure_ref "${TAG_REF}"
           else
             echo "Tag creation disabled in fallback"
           fi
@@ -200,4 +159,3 @@ jobs:
           echo "Tag ref: ${{ steps.ensure_refs.outputs.tag_ref }}"
           echo "Branch created: ${{ steps.ensure_refs.outputs.branch_created }}"
           echo "Tag created: ${{ steps.ensure_refs.outputs.tag_created }}"
-          echo "Tag updated: ${{ steps.ensure_refs.outputs.tag_updated }}"
