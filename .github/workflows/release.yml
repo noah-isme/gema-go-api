@@ -1,0 +1,161 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., v1.0.0)'
+        required: true
+      create_branch:
+        description: 'Create or ensure release branch refs/heads/release/<version>'
+        type: boolean
+        default: true
+      create_tag:
+        description: 'Create or ensure release tag refs/tags/<version>'
+        type: boolean
+        default: true
+      sha:
+        description: 'Optional target commit SHA (defaults to workflow run commit)'
+        required: false
+        default: ''
+
+jobs:
+  release:
+    name: Ensure release refs
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      VERSION_INPUT: ${{ inputs.version }}
+      CREATE_BRANCH: ${{ inputs.create_branch }}
+      CREATE_TAG: ${{ inputs.create_tag }}
+      TARGET_SHA: ${{ inputs.sha }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Ensure release branch and tag
+        id: ensure_refs
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const core = require('@actions/core');
+            const versionInput = (process.env.VERSION_INPUT || '').trim();
+            if (!versionInput) {
+              throw new Error('Missing required version input');
+            }
+            const createBranchInput = (process.env.CREATE_BRANCH || 'true').toString().toLowerCase();
+            const createTagInput = (process.env.CREATE_TAG || 'true').toString().toLowerCase();
+            const shouldCreateBranch = createBranchInput === 'true';
+            const shouldCreateTag = createTagInput === 'true';
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const version = versionInput.replace(/^refs\/(heads\/|tags\/)?/, '').replace(/^release\//, '');
+            const branchRef = `refs/heads/release/${version}`;
+            const tagRef = `refs/tags/${version}`;
+            const shaEnv = (process.env.TARGET_SHA || '').trim();
+            const targetSha = shaEnv || context.sha;
+
+            core.info(`github.rest namespaces: ${Object.keys(github.rest).join(', ')}`);
+            core.info(`Using target SHA: ${targetSha}`);
+            core.info(`Preparing refs for version: ${version}`);
+
+            async function ensureRef(ref) {
+              const apiRef = ref.replace(/^refs\//, '');
+              try {
+                await github.rest.git.getRef({ owner, repo, ref: apiRef });
+                core.info(`Ref already exists: ${ref} – skipping creation.`);
+                return { created: false, ref };
+              } catch (error) {
+                if (error.status === 404) {
+                  core.info(`Creating ref ${ref} -> ${targetSha}`);
+                  await github.rest.git.createRef({ owner, repo, ref, sha: targetSha });
+                  return { created: true, ref };
+                }
+                core.warning(`Failed to check ref ${ref}: ${error.message}`);
+                throw error;
+              }
+            }
+
+            const results = {};
+            if (shouldCreateBranch) {
+              results.branch = await ensureRef(branchRef);
+            } else {
+              core.info('Branch creation disabled via input.');
+            }
+            if (shouldCreateTag) {
+              results.tag = await ensureRef(tagRef);
+            } else {
+              core.info('Tag creation disabled via input.');
+            }
+
+            core.setOutput('branch_ref', branchRef);
+            core.setOutput('tag_ref', tagRef);
+            core.setOutput('branch_created', shouldCreateBranch && results.branch?.created ? 'true' : 'false');
+            core.setOutput('tag_created', shouldCreateTag && results.tag?.created ? 'true' : 'false');
+
+      - name: Fallback create refs via gh api
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION_INPUT: ${{ env.VERSION_INPUT }}
+          CREATE_BRANCH: ${{ env.CREATE_BRANCH }}
+          CREATE_TAG: ${{ env.CREATE_TAG }}
+          TARGET_SHA: ${{ env.TARGET_SHA }}
+        run: |
+          set -euo pipefail
+          VERSION="${VERSION_INPUT}"
+          if [ -z "$VERSION" ]; then
+            echo "Missing version input" >&2
+            exit 1
+          fi
+          VERSION_SANITIZED=${VERSION#refs/}
+          VERSION_SANITIZED=${VERSION_SANITIZED#heads/}
+          VERSION_SANITIZED=${VERSION_SANITIZED#tags/}
+          VERSION_SANITIZED=${VERSION_SANITIZED#release/}
+          BRANCH_REF="refs/heads/release/${VERSION_SANITIZED}"
+          TAG_REF="refs/tags/${VERSION_SANITIZED}"
+          TARGET_SHA_VALUE="${TARGET_SHA:-${GITHUB_SHA}}"
+
+          function ensure_ref() {
+            local ref=$1
+            local api_ref=${ref#refs/}
+            set +e
+            gh api "/repos/${GITHUB_REPOSITORY}/git/ref/${api_ref}" >/dev/null 2>&1
+            local exists=$?
+            set -e
+            if [ "$exists" -eq 0 ]; then
+              echo "Ref already exists: ${ref} (gh api fallback)"
+              return
+            fi
+            echo "Creating ref via gh api: ${ref} -> ${TARGET_SHA_VALUE}"
+            gh api \
+              --method POST \
+              -H "Accept: application/vnd.github+json" \
+              "/repos/${GITHUB_REPOSITORY}/git/refs" \
+              -f ref="${ref}" \
+              -f sha="${TARGET_SHA_VALUE}"
+          }
+
+          if [ "${CREATE_BRANCH}" = "true" ]; then
+            ensure_ref "${BRANCH_REF}"
+          else
+            echo "Branch creation disabled in fallback"
+          fi
+
+          if [ "${CREATE_TAG}" = "true" ]; then
+            ensure_ref "${TAG_REF}"
+          else
+            echo "Tag creation disabled in fallback"
+          fi
+
+      - name: Summary
+        if: ${{ always() }}
+        run: |
+          echo "Branch ref: ${{ steps.ensure_refs.outputs.branch_ref }}"
+          echo "Tag ref: ${{ steps.ensure_refs.outputs.tag_ref }}"
+          echo "Branch created: ${{ steps.ensure_refs.outputs.branch_created }}"
+          echo "Tag created: ${{ steps.ensure_refs.outputs.tag_created }}"
