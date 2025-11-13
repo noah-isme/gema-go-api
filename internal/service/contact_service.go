@@ -133,7 +133,7 @@ func (s *contactService) Submit(ctx context.Context, req dto.ContactRequest) (dt
 
 	observability.ContactSubmissions().WithLabelValues("sent").Inc()
 
-	maskedEmail := maskEmail(submission.Email)
+	maskedEmail := maskEmailAddress(submission.Email)
 	s.logger.Info().Str("reference_id", referenceID).Str("email", maskedEmail).Msg("contact submission processed")
 	span.SetStatus(codes.Ok, "delivered")
 
@@ -147,22 +147,4 @@ func computeChecksum(parts ...string) string {
 		hasher.Write([]byte("|"))
 	}
 	return hex.EncodeToString(hasher.Sum(nil))
-}
-
-func maskEmail(email string) string {
-	if email == "" {
-		return ""
-	}
-	parts := strings.Split(email, "@")
-	if len(parts) != 2 {
-		return "***"
-	}
-	local := parts[0]
-	domain := parts[1]
-	if len(local) <= 2 {
-		local = local[:1] + "***"
-	} else {
-		local = local[:1] + "***" + local[len(local)-1:]
-	}
-	return local + "@" + domain
 }

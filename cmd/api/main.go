@@ -58,6 +58,9 @@ func main() {
 		&models.DiscussionReply{},
 		&models.Announcement{},
 		&models.GalleryItem{},
+		&models.TutorialArticle{},
+		&models.TutorialProject{},
+		&models.RoadmapStage{},
 		&models.ContactSubmission{},
 		&models.UploadRecord{},
 	); err != nil {
@@ -100,6 +103,9 @@ func main() {
 	analyticsRepo := repository.NewAdminAnalyticsRepository(db)
 	announcementRepo := repository.NewAnnouncementRepository(db)
 	galleryRepo := repository.NewGalleryRepository(db)
+	tutorialArticleRepo := repository.NewTutorialArticleRepository(db)
+	tutorialProjectRepo := repository.NewTutorialProjectRepository(db)
+	roadmapRepo := repository.NewRoadmapStageRepository(db)
 	contactRepo := repository.NewContactRepository(db)
 	uploadRepo := repository.NewUploadRepository(db)
 
@@ -123,15 +129,20 @@ func main() {
 	adminAssignmentService := service.NewAdminAssignmentService(assignmentRepo, validate, activityService, logger)
 	adminGradingService := service.NewAdminGradingService(adminSubmissionRepo, validate, activityService, logger)
 	adminAnalyticsService := service.NewAdminAnalyticsService(analyticsRepo, redisClient, cfg.AnalyticsCacheTTL, logger)
+	adminGalleryService := service.NewAdminGalleryService(galleryRepo, validate, activityService, logger)
+	adminAnnouncementService := service.NewAdminAnnouncementService(announcementRepo, redisClient, validate, activityService, logger)
 	notificationService := service.NewNotificationService(notificationRepo, redisClient, cfg.RedisPubSubChannel, natsConn, validate, logger)
 	chatService := service.NewChatService(chatRepo, redisClient, cfg.RedisPubSubChannel, natsConn, validate, logger)
 	discussionService := service.NewDiscussionService(discussionRepo, notificationService, validate, logger)
 	activityFeedService := service.NewActivityFeedService(activityRepo, redisClient, 45*time.Second, logger)
 	announcementService := service.NewAnnouncementService(announcementRepo, redisClient, cfg.AnnouncementsCacheTTL, logger)
 	galleryService := service.NewGalleryService(galleryRepo, cfg.GalleryCDNBaseURL, logger)
+	tutorialContentService := service.NewTutorialContentService(tutorialArticleRepo, tutorialProjectRepo, validate, logger)
+	roadmapService := service.NewRoadmapService(roadmapRepo, redisClient, cfg.RoadmapCacheTTL, logger)
 
 	contactDelivery := service.NewLogContactDelivery(logger)
 	contactService := service.NewContactService(contactRepo, redisClient, validate, contactDelivery, logger)
+	adminContactService := service.NewAdminContactService(contactRepo, logger)
 	uploadService := service.NewUploadService(uploader, uploadRepo, cfg.UploadMaxMB, logger)
 	seedService := service.NewSeedService(announcementRepo, galleryRepo, cfg.SeedEnabled, cfg.SeedToken, logger)
 
@@ -207,12 +218,17 @@ func main() {
 	adminGradingHandler := handler.NewAdminGradingHandler(adminGradingService, logger)
 	adminAnalyticsHandler := handler.NewAdminAnalyticsHandler(adminAnalyticsService, logger)
 	adminActivityHandler := handler.NewAdminActivityHandler(activityService, logger)
+	adminGalleryHandler := handler.NewAdminGalleryHandler(adminGalleryService, logger)
+	adminAnnouncementHandler := handler.NewAdminAnnouncementHandler(adminAnnouncementService, logger)
 	chatHandler := handler.NewChatHandler(chatService, validate, logger)
 	notificationHandler := handler.NewNotificationHandler(notificationService, logger, cfg.SSEClientTimeout)
 	discussionHandler := handler.NewDiscussionHandler(discussionService, validate, logger)
 	activityFeedHandler := handler.NewActivityFeedHandler(activityFeedService, logger)
 	announcementHandler := handler.NewAnnouncementHandler(announcementService, logger)
 	galleryHandler := handler.NewGalleryHandler(galleryService, logger)
+	tutorialContentHandler := handler.NewTutorialContentHandler(tutorialContentService, logger)
+	roadmapHandler := handler.NewRoadmapHandler(roadmapService, logger)
+	adminContactHandler := handler.NewAdminContactHandler(adminContactService, logger)
 	contactHandler := handler.NewContactHandler(contactService, logger)
 	uploadHandler := handler.NewUploadHandler(uploadService, logger)
 	seedHandler := handler.NewSeedHandler(seedService, logger)
@@ -226,27 +242,32 @@ func main() {
 	middleware.Register(app, middleware.Config{Logger: &logger})
 	app.Get("/metrics", observability.MetricsHandler())
 	router.Register(app, cfg, router.Dependencies{
-		AssignmentHandler:       assignmentHandler,
-		SubmissionHandler:       submissionHandler,
-		StudentDashboardHandler: studentDashboardHandler,
-		WebLabHandler:           webLabHandler,
-		CodingTaskHandler:       codingTaskHandler,
-		CodingSubmissionHandler: codingSubmissionHandler,
-		AdminStudentHandler:     adminStudentHandler,
-		AdminAssignmentHandler:  adminAssignmentHandler,
-		AdminGradingHandler:     adminGradingHandler,
-		AdminAnalyticsHandler:   adminAnalyticsHandler,
-		AdminActivityHandler:    adminActivityHandler,
-		ChatHandler:             chatHandler,
-		NotificationHandler:     notificationHandler,
-		DiscussionHandler:       discussionHandler,
-		ActivityFeedHandler:     activityFeedHandler,
-		AnnouncementHandler:     announcementHandler,
-		GalleryHandler:          galleryHandler,
-		ContactHandler:          contactHandler,
-		UploadHandler:           uploadHandler,
-		SeedHandler:             seedHandler,
-		JWTMiddleware:           middleware.JWTProtected(cfg.JWTSecret),
+		AssignmentHandler:        assignmentHandler,
+		SubmissionHandler:        submissionHandler,
+		StudentDashboardHandler:  studentDashboardHandler,
+		WebLabHandler:            webLabHandler,
+		CodingTaskHandler:        codingTaskHandler,
+		CodingSubmissionHandler:  codingSubmissionHandler,
+		AdminStudentHandler:      adminStudentHandler,
+		AdminAssignmentHandler:   adminAssignmentHandler,
+		AdminGradingHandler:      adminGradingHandler,
+		AdminAnalyticsHandler:    adminAnalyticsHandler,
+		AdminActivityHandler:     adminActivityHandler,
+		AdminAnnouncementHandler: adminAnnouncementHandler,
+		AdminGalleryHandler:      adminGalleryHandler,
+		ChatHandler:              chatHandler,
+		NotificationHandler:      notificationHandler,
+		DiscussionHandler:        discussionHandler,
+		ActivityFeedHandler:      activityFeedHandler,
+		AnnouncementHandler:      announcementHandler,
+		GalleryHandler:           galleryHandler,
+		AdminContactHandler:      adminContactHandler,
+		RoadmapHandler:           roadmapHandler,
+		TutorialContentHandler:   tutorialContentHandler,
+		ContactHandler:           contactHandler,
+		UploadHandler:            uploadHandler,
+		SeedHandler:              seedHandler,
+		JWTMiddleware:            middleware.JWTProtected(cfg.JWTSecret),
 	})
 
 	go func() {

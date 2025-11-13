@@ -39,13 +39,44 @@ func (h *AssignmentHandler) Register(router fiber.Router) {
 }
 
 func (h *AssignmentHandler) list(c *fiber.Ctx) error {
-	ctx := c.Context()
-	assignments, err := h.service.List(ctx)
+	page, err := parseQueryInt(c, "page")
+	if err != nil {
+		return utils.SendError(c, fiber.StatusBadRequest, "invalid page")
+	}
+
+	pageSize, err := parseQueryInt(c, "pageSize")
+	if err != nil {
+		return utils.SendError(c, fiber.StatusBadRequest, "invalid page size")
+	}
+	if pageSize == 0 {
+		legacyPageSize, legacyErr := parseQueryInt(c, "page_size")
+		if legacyErr != nil {
+			return utils.SendError(c, fiber.StatusBadRequest, "invalid page size")
+		}
+		pageSize = legacyPageSize
+	}
+
+	request := dto.AssignmentListRequest{
+		Page:     page,
+		PageSize: pageSize,
+		Sort:     c.Query("sort"),
+		Search:   c.Query("search"),
+	}
+
+	result, err := h.service.List(c.Context(), request)
 	if err != nil {
 		return h.internalError(c, err)
 	}
 
-	return utils.SendSuccess(c, "assignments retrieved", assignments)
+	meta := fiber.Map{
+		"pagination": result.Pagination,
+		"sort":       result.Sort,
+	}
+	if result.Search != "" {
+		meta["search"] = result.Search
+	}
+
+	return utils.OK(c, result.Items, "assignments retrieved", meta)
 }
 
 func (h *AssignmentHandler) get(c *fiber.Ctx) error {

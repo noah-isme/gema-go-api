@@ -11,12 +11,13 @@ import (
 
 	"github.com/noah-isme/gema-go-api/internal/dto"
 	"github.com/noah-isme/gema-go-api/internal/models"
+	"github.com/noah-isme/gema-go-api/internal/observability"
 	"github.com/noah-isme/gema-go-api/internal/repository"
 )
 
 // StudentDashboardService produces aggregated dashboard metrics.
 type StudentDashboardService interface {
-	GetDashboard(ctx context.Context, studentID uint) (dto.StudentDashboardResponse, error)
+	GetDashboard(ctx context.Context, studentID uint) (dto.StudentDashboardResponse, bool, error)
 }
 
 type studentDashboardService struct {
@@ -40,7 +41,19 @@ func NewStudentDashboardService(assignments repository.AssignmentRepository, sub
 	}
 }
 
-func (s *studentDashboardService) GetDashboard(ctx context.Context, studentID uint) (dto.StudentDashboardResponse, error) {
+func (s *studentDashboardService) GetDashboard(ctx context.Context, studentID uint) (response dto.StudentDashboardResponse, cacheHit bool, err error) {
+	start := time.Now()
+	defer func() {
+		observability.DashboardLatency().Observe(time.Since(start).Seconds())
+		result := "success"
+		if err != nil {
+			result = "error"
+		} else if cacheHit {
+			result = "cached"
+		}
+		observability.DashboardRequests().WithLabelValues(result).Inc()
+	}()
+
 	cacheKey := fmt.Sprintf("dashboard:student:%d", studentID)
 
 	if s.cache != nil {
@@ -48,7 +61,8 @@ func (s *studentDashboardService) GetDashboard(ctx context.Context, studentID ui
 			var response dto.StudentDashboardResponse
 			if unmarshalErr := json.Unmarshal([]byte(cached), &response); unmarshalErr == nil {
 				s.logger.Debug().Uint("student_id", studentID).Msg("dashboard cache hit")
-				return response, nil
+				cacheHit = true
+				return response, true, nil
 			}
 		} else if err != redis.Nil {
 			s.logger.Warn().Err(err).Msg("failed to read dashboard cache")
@@ -57,13 +71,13 @@ func (s *studentDashboardService) GetDashboard(ctx context.Context, studentID ui
 
 	assignments, err := s.assignments.List(ctx)
 	if err != nil {
-		return dto.StudentDashboardResponse{}, err
+		return dto.StudentDashboardResponse{}, false, err
 	}
 
 	filter := repository.SubmissionFilter{StudentID: &studentID}
 	submissions, err := s.submissions.List(ctx, filter)
 	if err != nil {
-		return dto.StudentDashboardResponse{}, err
+		return dto.StudentDashboardResponse{}, false, err
 	}
 
 	response := s.buildResponse(assignments, submissions)
@@ -77,7 +91,7 @@ func (s *studentDashboardService) GetDashboard(ctx context.Context, studentID ui
 		}
 	}
 
-	return response, nil
+	return response, false, nil
 }
 
 func (s *studentDashboardService) buildResponse(assignments []models.Assignment, submissions []models.Submission) dto.StudentDashboardResponse {

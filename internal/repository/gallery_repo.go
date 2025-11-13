@@ -22,6 +22,10 @@ type GalleryFilter struct {
 type GalleryRepository interface {
 	List(ctx context.Context, filter GalleryFilter) ([]models.GalleryItem, int64, error)
 	UpsertBatch(ctx context.Context, items []models.GalleryItem) (int64, error)
+	GetByID(ctx context.Context, id uint) (models.GalleryItem, error)
+	Create(ctx context.Context, item *models.GalleryItem) error
+	Update(ctx context.Context, item *models.GalleryItem) error
+	Delete(ctx context.Context, id uint) error
 }
 
 type galleryRepository struct {
@@ -85,4 +89,29 @@ func (r *galleryRepository) UpsertBatch(ctx context.Context, items []models.Gall
 
 	result := tx.Create(&items)
 	return result.RowsAffected, result.Error
+}
+
+func (r *galleryRepository) GetByID(ctx context.Context, id uint) (models.GalleryItem, error) {
+	var item models.GalleryItem
+	err := r.db.WithContext(ctx).First(&item, id).Error
+	return item, err
+}
+
+func (r *galleryRepository) Create(ctx context.Context, item *models.GalleryItem) error {
+	return r.db.WithContext(ctx).Create(item).Error
+}
+
+func (r *galleryRepository) Update(ctx context.Context, item *models.GalleryItem) error {
+	return r.db.WithContext(ctx).Save(item).Error
+}
+
+func (r *galleryRepository) Delete(ctx context.Context, id uint) error {
+	result := r.db.WithContext(ctx).Delete(&models.GalleryItem{}, id)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }

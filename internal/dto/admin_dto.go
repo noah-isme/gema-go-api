@@ -191,6 +191,102 @@ type AdminActivityListResponse struct {
 	Pagination PaginationMeta          `json:"pagination"`
 }
 
+// AdminContactListRequest defines filters for contact submissions.
+type AdminContactListRequest struct {
+	Page     int
+	PageSize int
+	Status   string
+	Search   string
+	Sort     string
+}
+
+// AdminContactResponse serializes contact submissions for admin views.
+type AdminContactResponse struct {
+	ID          uint       `json:"id"`
+	ReferenceID string     `json:"reference_id"`
+	Name        string     `json:"name"`
+	Email       string     `json:"email"`
+	Message     string     `json:"message"`
+	Status      string     `json:"status"`
+	Source      string     `json:"source"`
+	CreatedAt   time.Time  `json:"created_at"`
+	DeliveredAt *time.Time `json:"delivered_at"`
+}
+
+// AdminContactListResponse wraps paginated contact submissions.
+type AdminContactListResponse struct {
+	Items      []AdminContactResponse `json:"items"`
+	Pagination PaginationMeta         `json:"pagination"`
+}
+
+// AdminGalleryRequest captures gallery mutation payloads.
+type AdminGalleryRequest struct {
+	Title   string   `json:"title" validate:"required,min=3"`
+	Caption string   `json:"caption" validate:"omitempty,max=500"`
+	ImageURL string  `json:"image_url" validate:"required,url"`
+	Tags    []string `json:"tags" validate:"omitempty,dive,required"`
+}
+
+// AdminGalleryResponse serializes gallery items for admin routes.
+type AdminGalleryResponse struct {
+	ID        uint      `json:"id"`
+	Slug      string    `json:"slug"`
+	Title     string    `json:"title"`
+	Caption   string    `json:"caption"`
+	ImageURL  string    `json:"image_url"`
+	Tags      []string  `json:"tags"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// AdminGalleryListResponse wraps paginated gallery data.
+type AdminGalleryListResponse struct {
+	Items      []AdminGalleryResponse `json:"items"`
+	Pagination PaginationMeta         `json:"pagination"`
+}
+
+// AdminGalleryListRequest describes filters for gallery admin list.
+type AdminGalleryListRequest struct {
+	Page     int
+	PageSize int
+	Tags     []string
+	Search   string
+}
+
+// AdminAnnouncementRequest captures admin announcement payloads.
+type AdminAnnouncementRequest struct {
+	Title    string `json:"title" validate:"required,min=5"`
+	Body     string `json:"body" validate:"required,min=20"`
+	StartsAt string `json:"starts_at" validate:"required,datetime=2006-01-02T15:04:05Z07:00"`
+	EndsAt   string `json:"ends_at" validate:"omitempty,datetime=2006-01-02T15:04:05Z07:00"`
+	IsPinned bool   `json:"is_pinned"`
+}
+
+// AdminAnnouncementResponse serializes admin announcement entities.
+type AdminAnnouncementResponse struct {
+	ID       uint       `json:"id"`
+	Slug     string     `json:"slug"`
+	Title    string     `json:"title"`
+	Body     string     `json:"body"`
+	StartsAt time.Time  `json:"starts_at"`
+	EndsAt   *time.Time `json:"ends_at"`
+	IsPinned bool       `json:"is_pinned"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// AdminAnnouncementListResponse wraps paginated announcements.
+type AdminAnnouncementListResponse struct {
+	Items      []AdminAnnouncementResponse `json:"items"`
+	Pagination PaginationMeta              `json:"pagination"`
+}
+
+// AdminAnnouncementListRequest captures filters for admin announcement list.
+type AdminAnnouncementListRequest struct {
+	Page     int
+	PageSize int
+	Search   string
+}
+
 func boolMapFromJSON(data datatypes.JSONMap) map[string]bool {
 	result := make(map[string]bool)
 	if data == nil {

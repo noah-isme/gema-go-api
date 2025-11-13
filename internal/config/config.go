@@ -28,6 +28,7 @@ type Config struct {
 	DashboardCacheTTL      time.Duration
 	AnalyticsCacheTTL      time.Duration
 	AnnouncementsCacheTTL  time.Duration
+	RoadmapCacheTTL        time.Duration
 	SSEClientTimeout       time.Duration
 	DockerHost             string
 	ExecutionTimeout       time.Duration
@@ -82,6 +83,7 @@ func Load() (Config, error) {
 	v.SetDefault("dashboard.cache_ttl", "5m")
 	v.SetDefault("analytics.cache_ttl", "2m")
 	v.SetDefault("announcements.cache_ttl", "5m")
+	v.SetDefault("roadmap.cache_ttl", "2m")
 	v.SetDefault("sse.client_timeout", "55s")
 	v.SetDefault("execution_timeout_ms", 5000)
 	v.SetDefault("code_run_memory_mb", 256)
@@ -125,6 +127,16 @@ func Load() (Config, error) {
 		return Config{}, fmt.Errorf("invalid announcements cache ttl: %w", err)
 	}
 
+	roadmapTTLString := v.GetString("roadmap.cache_ttl")
+	if roadmapTTLString == "" {
+		roadmapTTLString = "2m"
+	}
+
+	roadmapTTL, err := time.ParseDuration(roadmapTTLString)
+	if err != nil {
+		return Config{}, fmt.Errorf("invalid roadmap cache ttl: %w", err)
+	}
+
 	sseTimeoutString := v.GetString("sse.client_timeout")
 	if sseTimeoutString == "" {
 		sseTimeoutString = "55s"
@@ -158,6 +170,7 @@ func Load() (Config, error) {
 		DashboardCacheTTL:      ttl,
 		AnalyticsCacheTTL:      analyticsTTL,
 		AnnouncementsCacheTTL:  announcementsTTL,
+		RoadmapCacheTTL:        roadmapTTL,
 		SSEClientTimeout:       sseTimeout,
 		DockerHost:             v.GetString("docker_host"),
 		ExecutionTimeout:       time.Duration(timeoutMs) * time.Millisecond,

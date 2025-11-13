@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -16,10 +17,19 @@ type AnnouncementFilter struct {
 	PageSize int
 }
 
+// AdminAnnouncementFilter extends filtering options.
+type AdminAnnouncementFilter struct {
+	Page     int
+	PageSize int
+	Search   string
+}
+
 // AnnouncementRepository exposes persistence helpers for announcements.
 type AnnouncementRepository interface {
 	ListActive(ctx context.Context, filter AnnouncementFilter) ([]models.Announcement, int64, error)
 	UpsertBatch(ctx context.Context, items []models.Announcement) (int64, error)
+	ListAll(ctx context.Context, filter AdminAnnouncementFilter) ([]models.Announcement, int64, error)
+	Create(ctx context.Context, announcement *models.Announcement) error
 }
 
 type announcementRepository struct {
@@ -71,4 +81,37 @@ func (r *announcementRepository) UpsertBatch(ctx context.Context, items []models
 
 	result := tx.Create(&items)
 	return result.RowsAffected, result.Error
+}
+
+func (r *announcementRepository) ListAll(ctx context.Context, filter AdminAnnouncementFilter) ([]models.Announcement, int64, error) {
+	query := r.db.WithContext(ctx).Model(&models.Announcement{})
+
+	if filter.Search != "" {
+		pattern := "%" + strings.ToLower(strings.TrimSpace(filter.Search)) + "%"
+		query = query.Where("LOWER(title) LIKE ? OR LOWER(body) LIKE ?", pattern, pattern)
+	}
+
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	if filter.PageSize > 0 {
+		page := filter.Page
+		if page <= 0 {
+			page = 1
+		}
+		offset := (page - 1) * filter.PageSize
+		query = query.Offset(offset).Limit(filter.PageSize)
+	}
+
+	var items []models.Announcement
+	if err := query.Order("starts_at DESC").Find(&items).Error; err != nil {
+		return nil, 0, err
+	}
+	return items, total, nil
+}
+
+func (r *announcementRepository) Create(ctx context.Context, announcement *models.Announcement) error {
+	return r.db.WithContext(ctx).Create(announcement).Error
 }

@@ -12,27 +12,32 @@ import (
 
 // Dependencies groups router dependencies for registration.
 type Dependencies struct {
-	AssignmentHandler       *handler.AssignmentHandler
-	SubmissionHandler       *handler.SubmissionHandler
-	StudentDashboardHandler *handler.StudentDashboardHandler
-	WebLabHandler           *handler.WebLabHandler
-	CodingTaskHandler       *handler.CodingTaskHandler
-	CodingSubmissionHandler *handler.CodingSubmissionHandler
-	AdminStudentHandler     *handler.AdminStudentHandler
-	AdminAssignmentHandler  *handler.AdminAssignmentHandler
-	AdminGradingHandler     *handler.AdminGradingHandler
-	AdminAnalyticsHandler   *handler.AdminAnalyticsHandler
-	AdminActivityHandler    *handler.AdminActivityHandler
-	ChatHandler             *handler.ChatHandler
-	NotificationHandler     *handler.NotificationHandler
-	DiscussionHandler       *handler.DiscussionHandler
-	ActivityFeedHandler     *handler.ActivityFeedHandler
-	AnnouncementHandler     *handler.AnnouncementHandler
-	GalleryHandler          *handler.GalleryHandler
-	ContactHandler          *handler.ContactHandler
-	UploadHandler           *handler.UploadHandler
-	SeedHandler             *handler.SeedHandler
-	JWTMiddleware           fiber.Handler
+	AssignmentHandler        *handler.AssignmentHandler
+	SubmissionHandler        *handler.SubmissionHandler
+	TutorialContentHandler   *handler.TutorialContentHandler
+	RoadmapHandler           *handler.RoadmapHandler
+	StudentDashboardHandler  *handler.StudentDashboardHandler
+	WebLabHandler            *handler.WebLabHandler
+	CodingTaskHandler        *handler.CodingTaskHandler
+	CodingSubmissionHandler  *handler.CodingSubmissionHandler
+	AdminStudentHandler      *handler.AdminStudentHandler
+	AdminAssignmentHandler   *handler.AdminAssignmentHandler
+	AdminGradingHandler      *handler.AdminGradingHandler
+	AdminAnalyticsHandler    *handler.AdminAnalyticsHandler
+	AdminActivityHandler     *handler.AdminActivityHandler
+	AdminContactHandler      *handler.AdminContactHandler
+	AdminGalleryHandler      *handler.AdminGalleryHandler
+	AdminAnnouncementHandler *handler.AdminAnnouncementHandler
+	ChatHandler              *handler.ChatHandler
+	NotificationHandler      *handler.NotificationHandler
+	DiscussionHandler        *handler.DiscussionHandler
+	ActivityFeedHandler      *handler.ActivityFeedHandler
+	AnnouncementHandler      *handler.AnnouncementHandler
+	GalleryHandler           *handler.GalleryHandler
+	ContactHandler           *handler.ContactHandler
+	UploadHandler            *handler.UploadHandler
+	SeedHandler              *handler.SeedHandler
+	JWTMiddleware            fiber.Handler
 }
 
 // Register wires the HTTP routes into the fiber application.
@@ -60,6 +65,19 @@ func Register(app *fiber.App, cfg config.Config, deps Dependencies) {
 			submissionGroup := tutorial.Group("/submissions")
 			deps.SubmissionHandler.Register(submissionGroup)
 		}
+	}
+
+	if deps.TutorialContentHandler != nil {
+		publicTutorial := app.Group("/api/tutorial")
+		deps.TutorialContentHandler.RegisterPublic(publicTutorial)
+
+		adminTutorial := app.Group("/api/tutorial", jwtMiddleware, middleware.RequireRole("admin", "teacher"))
+		deps.TutorialContentHandler.RegisterAdmin(adminTutorial)
+	}
+
+	if deps.RoadmapHandler != nil {
+		roadmap := app.Group("/api/roadmap")
+		deps.RoadmapHandler.Register(roadmap)
 	}
 
 	// Web Lab
@@ -102,7 +120,7 @@ func Register(app *fiber.App, cfg config.Config, deps Dependencies) {
 		deps.DiscussionHandler.Register(discussions)
 	}
 
-	if deps.AdminStudentHandler != nil || deps.AdminAssignmentHandler != nil || deps.AdminGradingHandler != nil || deps.AdminAnalyticsHandler != nil || deps.AdminActivityHandler != nil {
+	if deps.AdminStudentHandler != nil || deps.AdminAssignmentHandler != nil || deps.AdminGradingHandler != nil || deps.AdminAnalyticsHandler != nil || deps.AdminActivityHandler != nil || deps.AdminContactHandler != nil || deps.AdminGalleryHandler != nil || deps.AdminAnnouncementHandler != nil {
 		admin := app.Group("/api/admin", jwtMiddleware, middleware.RequireRole("admin", "teacher"))
 
 		if deps.AdminStudentHandler != nil {
@@ -128,6 +146,20 @@ func Register(app *fiber.App, cfg config.Config, deps Dependencies) {
 		if deps.AdminActivityHandler != nil {
 			activityGroup := admin.Group("/activities")
 			deps.AdminActivityHandler.Register(activityGroup)
+		}
+
+		if deps.AdminContactHandler != nil {
+			contactGroup := admin.Group("/contacts")
+			deps.AdminContactHandler.Register(contactGroup)
+		}
+
+		if deps.AdminGalleryHandler != nil {
+			galleryGroup := admin.Group("/gallery")
+			deps.AdminGalleryHandler.Register(galleryGroup)
+		}
+		if deps.AdminAnnouncementHandler != nil {
+			announcementGroup := admin.Group("/announcements")
+			deps.AdminAnnouncementHandler.Register(announcementGroup)
 		}
 	}
 	if deps.ActivityFeedHandler != nil {

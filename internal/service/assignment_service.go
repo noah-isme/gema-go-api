@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"mime/multipart"
+	"strings"
 	"time"
 
 	"github.com/go-playground/validator/v10"
@@ -27,7 +29,7 @@ type FileUploader interface {
 
 // AssignmentService exposes assignment domain use cases.
 type AssignmentService interface {
-	List(ctx context.Context) ([]dto.AssignmentResponse, error)
+	List(ctx context.Context, req dto.AssignmentListRequest) (dto.AssignmentListResult, error)
 	Get(ctx context.Context, id uint) (dto.AssignmentResponse, error)
 	Create(ctx context.Context, payload dto.AssignmentCreateRequest, file *multipart.FileHeader) (dto.AssignmentResponse, error)
 	Update(ctx context.Context, id uint, payload dto.AssignmentUpdateRequest, file *multipart.FileHeader) (dto.AssignmentResponse, error)
@@ -53,13 +55,41 @@ func NewAssignmentService(repo repository.AssignmentRepository, validate *valida
 	}
 }
 
-func (s *assignmentService) List(ctx context.Context) ([]dto.AssignmentResponse, error) {
-	assignments, err := s.repo.List(ctx)
-	if err != nil {
-		return nil, err
+func (s *assignmentService) List(ctx context.Context, req dto.AssignmentListRequest) (dto.AssignmentListResult, error) {
+	page := normalizePage(req.Page)
+	pageSize := clampPageSize(req.PageSize)
+	search := strings.TrimSpace(req.Search)
+	sort := strings.ToLower(strings.TrimSpace(req.Sort))
+	if sort == "" {
+		sort = "due_date"
 	}
 
-	return dto.NewAssignmentResponseSlice(assignments), nil
+	filter := repository.AssignmentFilter{
+		Search:   search,
+		Sort:     sort,
+		Page:     page,
+		PageSize: pageSize,
+	}
+
+	assignments, total, err := s.repo.ListWithFilter(ctx, filter)
+	if err != nil {
+		return dto.AssignmentListResult{}, err
+	}
+
+	items := dto.NewAssignmentResponseSlice(assignments)
+	pagination := dto.PaginationMeta{
+		Page:       page,
+		PageSize:   pageSize,
+		TotalItems: total,
+		TotalPages: calculateTotalPages(total, pageSize),
+	}
+
+	return dto.AssignmentListResult{
+		Items:      items,
+		Pagination: pagination,
+		Sort:       sort,
+		Search:     search,
+	}, nil
 }
 
 func (s *assignmentService) Get(ctx context.Context, id uint) (dto.AssignmentResponse, error) {
@@ -189,4 +219,21 @@ func (s *assignmentService) uploadFile(ctx context.Context, file *multipart.File
 	}
 
 	return url, nil
+}
+
+func normalizePage(page int) int {
+	if page <= 0 {
+		return 1
+	}
+	return page
+}
+
+func calculateTotalPages(total int64, pageSize int) int {
+	if pageSize <= 0 {
+		if total == 0 {
+			return 1
+		}
+		return 1
+	}
+	return int(math.Ceil(float64(total) / float64(pageSize)))
 }

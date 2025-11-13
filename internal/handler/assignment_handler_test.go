@@ -106,10 +106,18 @@ func TestAssignmentHandlerCreateAndList(t *testing.T) {
 		Success bool                     `json:"success"`
 		Data    []dto.AssignmentResponse `json:"data"`
 		Message string                   `json:"message"`
+		Meta    struct {
+			Pagination dto.PaginationMeta `json:"pagination"`
+			Sort       string             `json:"sort"`
+			Search     string             `json:"search"`
+		} `json:"meta"`
 	}
 	decodeResponse(t, listResp, &listBody)
 	require.True(t, listBody.Success)
 	require.NotEmpty(t, listBody.Data)
+	require.Equal(t, 1, listBody.Meta.Pagination.Page)
+	require.Equal(t, 20, listBody.Meta.Pagination.PageSize)
+	require.Equal(t, "due_date", listBody.Meta.Sort)
 }
 
 func decodeResponse(t *testing.T, resp *http.Response, target interface{}) {

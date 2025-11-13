@@ -23,6 +23,10 @@ var (
 	announcementsLatency        prometheus.Histogram
 	galleryRequests             *prometheus.CounterVec
 	galleryLatency              prometheus.Histogram
+	roadmapRequests             *prometheus.CounterVec
+	roadmapLatency              prometheus.Histogram
+	dashboardRequests           *prometheus.CounterVec
+	dashboardLatency            prometheus.Histogram
 	contactSubmissions          *prometheus.CounterVec
 	uploadRequests              *prometheus.CounterVec
 	uploadRejected              *prometheus.CounterVec
@@ -111,6 +115,28 @@ func RegisterMetrics() {
 			Buckets: prometheus.DefBuckets,
 		})
 
+		roadmapRequests = prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "roadmap_requests_total",
+			Help: "Total number of roadmap stage requests served.",
+		}, []string{"result"})
+
+		roadmapLatency = prometheus.NewHistogram(prometheus.HistogramOpts{
+			Name:    "roadmap_latency_seconds",
+			Help:    "Latency distribution for roadmap endpoints.",
+			Buckets: prometheus.DefBuckets,
+		})
+
+		dashboardRequests = prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "student_dashboard_requests_total",
+			Help: "Total number of student dashboard requests.",
+		}, []string{"result"})
+
+		dashboardLatency = prometheus.NewHistogram(prometheus.HistogramOpts{
+			Name:    "student_dashboard_latency_seconds",
+			Help:    "Latency distribution for student dashboard endpoint.",
+			Buckets: prometheus.DefBuckets,
+		})
+
 		contactSubmissions = prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name: "contact_submissions_total",
 			Help: "Total number of contact submissions processed.",
@@ -148,6 +174,10 @@ func RegisterMetrics() {
 			announcementsLatency,
 			galleryRequests,
 			galleryLatency,
+			roadmapRequests,
+			roadmapLatency,
+			dashboardRequests,
+			dashboardLatency,
 			contactSubmissions,
 			uploadRequests,
 			uploadRejected,
@@ -244,6 +274,30 @@ func GalleryRequests() *prometheus.CounterVec {
 func GalleryLatency() prometheus.Histogram {
 	RegisterMetrics()
 	return galleryLatency
+}
+
+// RoadmapRequests exposes roadmap counter.
+func RoadmapRequests() *prometheus.CounterVec {
+	RegisterMetrics()
+	return roadmapRequests
+}
+
+// RoadmapLatency exposes roadmap latency histogram.
+func RoadmapLatency() prometheus.Histogram {
+	RegisterMetrics()
+	return roadmapLatency
+}
+
+// DashboardRequests exposes dashboard counter.
+func DashboardRequests() *prometheus.CounterVec {
+	RegisterMetrics()
+	return dashboardRequests
+}
+
+// DashboardLatency exposes dashboard latency histogram.
+func DashboardLatency() prometheus.Histogram {
+	RegisterMetrics()
+	return dashboardLatency
 }
 
 // ContactSubmissions exposes the contact submissions counter.

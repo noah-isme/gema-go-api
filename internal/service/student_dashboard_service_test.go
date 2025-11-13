@@ -73,8 +73,9 @@ func TestStudentDashboardServiceAggregationAndCaching(t *testing.T) {
 	svc := NewStudentDashboardService(assignmentRepo, submissionRepo, redisClient, time.Minute, zerolog.Nop())
 
 	ctx := context.Background()
-	first, err := svc.GetDashboard(ctx, studentID)
+	first, hit, err := svc.GetDashboard(ctx, studentID)
 	require.NoError(t, err)
+	require.False(t, hit)
 	require.Equal(t, 3, first.Summary.TotalAssignments)
 	require.Equal(t, 2, first.Summary.Submitted)
 	require.Equal(t, 1, first.Summary.Graded)
@@ -88,8 +89,9 @@ func TestStudentDashboardServiceAggregationAndCaching(t *testing.T) {
 	// Modify database to ensure cached response is returned unchanged.
 	require.NoError(t, db.Model(&assignments[0]).Update("title", "Changed Title").Error)
 
-	second, err := svc.GetDashboard(ctx, studentID)
+	second, hit2, err := svc.GetDashboard(ctx, studentID)
 	require.NoError(t, err)
+	require.True(t, hit2)
 	require.Equal(t, first, second)
 }
 
@@ -124,7 +126,8 @@ func TestStudentDashboardCacheHit(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, redisClient.Set(ctx, "dashboard:student:10", payload, time.Minute).Err())
 
-	response, err := svc.GetDashboard(ctx, studentID)
+	response, hit, err := svc.GetDashboard(ctx, studentID)
 	require.NoError(t, err)
 	require.Equal(t, cached, response)
+	require.True(t, hit)
 }

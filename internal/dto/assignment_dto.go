@@ -6,6 +6,22 @@ import (
 	"github.com/noah-isme/gema-go-api/internal/models"
 )
 
+// AssignmentListRequest captures filters used when listing assignments.
+type AssignmentListRequest struct {
+	Page     int
+	PageSize int
+	Sort     string
+	Search   string
+}
+
+// AssignmentListResult holds assignment items plus pagination metadata.
+type AssignmentListResult struct {
+	Items      []AssignmentResponse `json:"items"`
+	Pagination PaginationMeta       `json:"pagination"`
+	Sort       string               `json:"sort,omitempty"`
+	Search     string               `json:"search,omitempty"`
+}
+
 const isoLayout = time.RFC3339
 
 // AssignmentCreateRequest describes the payload for creating a new assignment.

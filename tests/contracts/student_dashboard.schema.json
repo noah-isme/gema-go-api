@@ -1,0 +1,112 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "StudentDashboardEnvelope",
+  "type": "object",
+  "required": ["success", "message", "data", "meta"],
+  "properties": {
+    "success": { "type": "boolean" },
+    "message": { "type": "string" },
+    "meta": {
+      "anyOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "required": ["cache_hit", "generated_at"],
+          "properties": {
+            "cache_hit": { "type": "boolean" },
+            "generated_at": { "type": "string", "format": "date-time" }
+          },
+          "additionalProperties": true
+        }
+      ]
+    },
+    "details": { "type": ["object", "null"] },
+    "data": {
+      "type": "object",
+      "required": ["summary", "pending_assignments", "recent_submissions"],
+      "properties": {
+        "summary": {
+          "type": "object",
+          "required": [
+            "total_assignments",
+            "submitted",
+            "graded",
+            "pending",
+            "overdue",
+            "average_grade",
+            "completion_rate"
+          ],
+          "properties": {
+            "total_assignments": { "type": "integer", "minimum": 0 },
+            "submitted": { "type": "integer", "minimum": 0 },
+            "graded": { "type": "integer", "minimum": 0 },
+            "pending": { "type": "integer", "minimum": 0 },
+            "overdue": { "type": "integer", "minimum": 0 },
+            "average_grade": { "type": "number" },
+            "completion_rate": { "type": "number" }
+          },
+          "additionalProperties": false
+        },
+        "pending_assignments": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "assignment_id",
+              "title",
+              "due_date",
+              "file_url",
+              "status",
+              "submission_url",
+              "feedback",
+              "updated_at",
+              "overdue"
+            ],
+            "properties": {
+              "assignment_id": { "type": "integer", "minimum": 1 },
+              "title": { "type": "string" },
+              "due_date": { "type": "string", "format": "date-time" },
+              "file_url": { "type": "string" },
+              "status": { "type": "string" },
+              "submission_id": { "type": ["integer", "null"] },
+              "submission_url": { "type": "string" },
+              "grade": { "type": ["number", "null"] },
+              "feedback": { "type": "string" },
+              "updated_at": { "type": "string", "format": "date-time" },
+              "overdue": { "type": "boolean" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "recent_submissions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "submission_id",
+              "assignment_id",
+              "assignment_name",
+              "status",
+              "feedback",
+              "created_at",
+              "updated_at"
+            ],
+            "properties": {
+              "submission_id": { "type": "integer", "minimum": 1 },
+              "assignment_id": { "type": "integer", "minimum": 1 },
+              "assignment_name": { "type": "string" },
+              "status": { "type": "string" },
+              "grade": { "type": ["number", "null"] },
+              "feedback": { "type": "string" },
+              "created_at": { "type": "string", "format": "date-time" },
+              "updated_at": { "type": "string", "format": "date-time" }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

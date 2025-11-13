@@ -6,6 +6,8 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http/httptest"
+	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -15,6 +17,7 @@ import (
 
 	"github.com/noah-isme/gema-go-api/internal/dto"
 	"github.com/noah-isme/gema-go-api/internal/models"
+	"github.com/noah-isme/gema-go-api/internal/repository"
 )
 
 type memoryAssignmentRepo struct {
@@ -35,6 +38,44 @@ func (m *memoryAssignmentRepo) List(ctx context.Context) ([]models.Assignment, e
 		results = append(results, assignment)
 	}
 	return results, nil
+}
+
+func (m *memoryAssignmentRepo) ListWithFilter(ctx context.Context, filter repository.AssignmentFilter) ([]models.Assignment, int64, error) {
+	filtered := make([]models.Assignment, 0, len(m.assignments))
+	search := strings.ToLower(strings.TrimSpace(filter.Search))
+	for _, assignment := range m.assignments {
+		if search != "" {
+			title := strings.ToLower(assignment.Title)
+			desc := strings.ToLower(assignment.Description)
+			if !strings.Contains(title, search) && !strings.Contains(desc, search) {
+				continue
+			}
+		}
+		filtered = append(filtered, assignment)
+	}
+
+	sort.Slice(filtered, func(i, j int) bool {
+		return filtered[i].DueDate.Before(filtered[j].DueDate)
+	})
+
+	total := int64(len(filtered))
+	if filter.PageSize > 0 {
+		page := filter.Page
+		if page <= 0 {
+			page = 1
+		}
+		start := (page - 1) * filter.PageSize
+		if start >= len(filtered) {
+			return []models.Assignment{}, total, nil
+		}
+		end := start + filter.PageSize
+		if end > len(filtered) {
+			end = len(filtered)
+		}
+		filtered = filtered[start:end]
+	}
+
+	return filtered, total, nil
 }
 
 func (m *memoryAssignmentRepo) GetByID(ctx context.Context, id uint) (models.Assignment, error) {
@@ -149,6 +190,36 @@ func TestAssignmentServiceUpdateReplacesFile(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, updated.FileURL)
 	require.Equal(t, 1, uploader.uploads)
+}
+
+func TestAssignmentServiceListSupportsSearchAndPagination(t *testing.T) {
+	repo := newMemoryAssignmentRepo()
+	uploader := &stubUploader{}
+	validate := validator.New(validator.WithRequiredStructEnabled())
+	svc := NewAssignmentService(repo, validate, uploader, testLogger())
+
+	now := time.Now().Add(24 * time.Hour)
+	payloads := []dto.AssignmentCreateRequest{
+		{Title: "Graph Theory", Description: "learn graphs", DueDate: now.Format(time.RFC3339)},
+		{Title: "Sorting", Description: "learn sorting", DueDate: now.Add(24 * time.Hour).Format(time.RFC3339)},
+		{Title: "Graphs Advanced", Description: "advanced graphs", DueDate: now.Add(48 * time.Hour).Format(time.RFC3339)},
+	}
+
+	for _, payload := range payloads {
+		_, err := svc.Create(context.Background(), payload, nil)
+		require.NoError(t, err)
+	}
+
+	result, err := svc.List(context.Background(), dto.AssignmentListRequest{
+		Page:     1,
+		PageSize: 1,
+		Search:   "graph",
+	})
+	require.NoError(t, err)
+	require.Len(t, result.Items, 1)
+	require.Equal(t, "Graph Theory", result.Items[0].Title)
+	require.Equal(t, int64(2), result.Pagination.TotalItems)
+	require.Equal(t, "graph", result.Search)
 }
 
 func newTestFileHeader(t *testing.T, name string, content []byte) *multipart.FileHeader {
